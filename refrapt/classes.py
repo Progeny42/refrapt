@@ -1,21 +1,19 @@
+"""Classes for abstraction and use with Refrapt."""
+
 from enum import Enum
 import logging
 import os
 import multiprocessing 
 import sys
-import math
 import re
-import itertools
 from functools import partial
 import tqdm
 
-from helpers import (
-    SanitiseUri,
-    WaitForThreads
-)
+from helpers import SanitiseUri
 
 class Settings:
     def __init__(self):
+        """Initialises a new Settings class."""
         self._settings = {
             "architecture"      : "i386", 
             "rootPath"          : "/var/spool/refrapt",
@@ -36,10 +34,12 @@ class Settings:
             "language"          : "en",   # TODO : Default to locale
             "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
             "forceDownload"     : False,  # Use this to force Wget to redownload the file, even if the timestamp of the file matches that on the server. Use this in the event of an interrupted download
-            "logLevel"          : "INFO"
+            "logLevel"          : "INFO",
+            "test"              : False
         }
 
-    def Parse(self, config):
+    def Parse(self, config: str):
+        """Parse the configuration file and set the settings defined."""
         for line in config:
             if line.startswith("set"):
                 key = line.split("set ")[1].split("=")[0].strip()
@@ -51,120 +51,158 @@ class Settings:
                     logging.warn(f"Unknown setting in configuration file '{line}'")
 
     @property
+    def Test(self) -> bool:
+        """Get whether Test mode is enabled."""
+        return self._settings["test"]
+
+    @Test.setter
+    def Test(self, value: bool):
+        """Set whether Test mode is enabled."""
+        self._settings["test"] = value
+
+    @property
     def Architecture(self) -> str:
+        """Get the default Architecture."""
         return self._settings["architecture"]
 
     @property
     def MirrorPath(self) -> str:
+        """Get the path to the /mirror directory."""
         return self._settings["rootPath"] + "/" + self._settings["mirrorPath"]
 
     @property
     def SkelPath(self) -> str:
+        """Get the path to the /skel directory."""
         return self._settings["rootPath"] + "/" + self._settings["skelPath"]
 
     @property
     def VarPath(self) -> str:
+        """Get the path to the /var directory."""
         return self._settings["rootPath"] + "/" + self._settings["varPath"]
 
     @property
     def Contents(self) -> bool:
+        """Get whether Contents files should be included."""
         return self._settings["contents"]
 
     @property
     def Threads(self) -> int:
+        """Get the number of threads to use for multiprocessing tasks."""
         return self._settings["threads"]
         
     @property
     def AuthNoChallege(self) -> bool:
+        """Get whether Wget should use the --auth-no-challenge parameter."""
         return self._settings["authNoChallenge"]
 
     @property
     def NoCheckCertificate(self) -> bool:
+        """Get whether Wget should use the --no-check-certificate parameter."""
         return self._settings["noCheckCertificate"]
     
     @property
     def Unlink(self) -> bool:
+        """Get whether Wget should use the --unlink parameter."""
         return self._settings["unlink"]
 
     @property
     def UseProxy(self) -> bool:
+        """Get whether Wget should use the -e use_proxy=yes parameter."""
         return self._settings["useProxy"]
 
     @property
     def UseHttpProxy(self) -> bool:
+        """Get whether the httpProxy setting is defined."""
         return len(self._settings["httpProxy"]) > 0
 
     @property
     def HttpProxy(self) -> str:
+        """Get the httpProxy setting."""
         return self._settings["httpProxy"]
 
     @property
     def UseHttpsProxy(self) -> bool:
+        """Get whether the httpsProxy setting is defined."""
         return len(self._settings["httpsProxy"]) > 0
 
     @property
     def HttpsProxy(self) -> str:
+        """Get the httpsProxy setting."""
         return self._settings["httpsProxy"]
 
     @property
     def UseProxyUser(self) -> bool:
+        """Get whether the proxyUser setting is defined."""
         return len(self._settings["proxyUser"]) > 0
 
     @property
     def ProxyUser(self) -> str:
+        """Get the proxyUser setting."""
         return self._settings["proxyUser"]
 
     @property
     def UseProxyPassword(self) -> bool:
+        """Get whether the proxyPass setting is defined."""
         return len(self._settings["proxyPass"]) > 0
 
     @property
     def ProxyPassword(self) -> str:
+        """Get the proxyPass setting."""
         return self._settings["proxyPass"]
 
     @property
     def LimitRate(self) -> str:
+        """Get the value of the --limit-rate setting used for Wget."""
         return self._settings["limitRate"]
 
     @property
     def Language(self) -> str:
+        """Get the local languge setting."""
         return self._settings["language"]
 
     @property
     def ForceUpdate(self) -> bool:
+        """Get whether updates of files should be forced."""
         return self._settings["forceUpdate"]
 
     @property
     def ForceDownload(self) -> bool:
+        """Get whether downloads of files should be forced."""
         return self._settings["forceDownload"]
 
     @property
     def LogLevel(self) -> str:
+        """Get the log level used for application logging."""
         return logging._nameToLevel[self._settings["logLevel"]]
 
 
 class SourceType(Enum):
+    """Distinguish between Binary and Source mirrors."""
     Bin = 0
     Src = 1
 
 class UrlType(Enum):
+    """Type of downloadable files."""
     Index       = 0
     Translation = 1
     Dep11       = 2
     Archive     = 3
 
 class IndexType(Enum):
+    """Type of Index files."""
     Index   = 0
     Release = 1
     Dep11   = 2
 
 class Source:
+    """Represents a Source as defined the Configuration file."""
     def __init__(self, line, defaultArch):
+        """Initialises a Source a line from the Configuration file and the default Architecture."""
         self._sourceType = SourceType.Bin
-        self._architectures = []
+        self._architectures = [] # type: list[str]
         self._uri = None
         self._distribution = None
-        self._components = []
+        self._components = [] # type: list[str]
         self._clean = True
 
         # Break down the line into its parts
@@ -199,7 +237,8 @@ class Source:
         logging.debug(f"\tDistribution: {self._distribution}")
         logging.debug(f"\tComponents:   {self._components}")
 
-    def GetIndexes(self, settings) -> list:
+    def GetIndexes(self, settings: Settings) -> list:
+        """Get a list of all Indexes for the Source."""
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
 
         indexes = []
@@ -251,12 +290,14 @@ class Source:
 
 
     def GetReleaseFiles(self) -> list:
+        """Get a list of all Release files for the Source."""
         if self._sourceType == SourceType.Src:
             return self.__GetSourceIndexes()
         elif self._sourceType == SourceType.Bin:
             return self.__GetPackageIndexes()
 
     def __GetSourceIndexes(self) -> list:
+        """Get a list of all Indexes for the Source if it represents a deb-src mirror."""
         indexes = []
 
         if self._components:
@@ -268,6 +309,7 @@ class Source:
         return indexes
 
     def __GetPackageIndexes(self) -> list:
+        """Get a list of all Indexes for the Source if it represents a deb mirror."""
         indexes = []
 
         if self._components:
@@ -279,7 +321,8 @@ class Source:
 
         return indexes
 
-    def GetTranslationIndexes(self, settings) -> list:
+    def GetTranslationIndexes(self, settings: Settings) -> list:
+        """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
             return
         
@@ -292,7 +335,8 @@ class Source:
 
         return translationIndexes
 
-    def GetDep11Files(self, settings) -> list:
+    def GetDep11Files(self, settings: Settings) -> list:
+        """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
             return
         
@@ -307,9 +351,11 @@ class Source:
 
         return dep11Files
 
-    def __ProcessTranslationIndex(self, url, component, settings) -> list:
-        # Extract all translation files from the dists/$DIST/$COMPONENT/i18n/Index
-        # file. Fall back to parsing dists/$DIST/Release if i18n/Index is not found.
+    def __ProcessTranslationIndex(self, url: str, component: str, settings: Settings) -> list:
+        """Extract all Translation files from the /dists/$DIST/$COMPONENT/i18n/Index file.
+        
+           Falls back to parsing /dists/$DIST/Release if /i18n/Index is not found.
+        """
 
         baseUri = url + component + "/i18n/"
         indexUri = baseUri + "Index"
@@ -322,7 +368,8 @@ class Source:
         else:
             return self.__ProcessLine(indexPath, IndexType.Index, indexUri, baseUri, "")
 
-    def __ProcessLine(self, file, indexType, indexUri, baseUri = "", component = "") -> list:
+    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
+        """Parses an Index file for all filenames."""
         checksums = False
 
         indexes = []
@@ -344,7 +391,6 @@ class Source:
                         filename = parts[2].rstrip()
 
                         if indexType == IndexType.Release:
-                            #if re.match(f"^{component}/i18n/Translation-{settings.Language}*\.(gz|bz2|xz)$", filename):
                             if re.match(f"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
                                 indexes.append(indexUri + filename)
                         elif indexType == IndexType.Dep11:
@@ -362,34 +408,43 @@ class Source:
 
     @property
     def SourceType(self) -> SourceType:
+        """Gets the type of Source this object represents."""
         return self._sourceType
 
     @property
     def Uri(self) -> str:
+        """Gets the Uri of the Source."""
         return self._uri
 
     @property
     def Distribution(self) -> str:
+        """Gets the Distribution of the Source."""
         return self._distribution
 
     @property   
     def Components(self) -> list:
+        """Gets the Components of the Source."""
         return self._components
 
     @property   
     def Architectures(self) -> list:
+        """Gets the Architectures of the Source."""
         return self._architectures
 
     @property
     def Clean(self) -> bool:
+        """Gets whether the resulting directory should be cleaned."""
         return self._clean
 
     @Clean.setter
-    def Clean(self, value):
+    def Clean(self, value: bool):
+        """Sets whether the resulting directory should be cleaned."""
         self._clean = value
 
 class Downloader:
-    def Download(urls, kind, settings):
+    """Downloads a list of files."""
+    def Download(urls: list, kind: UrlType, settings: Settings):
+        """Download a list of files of a specific type"""
         if not urls:
             logging.info("No files to download")
             return
@@ -403,7 +458,8 @@ class Downloader:
             for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file"):
                 pass
 
-    def DownloadUrlsProcess(urls, kind, args, settings):
+    def DownloadUrlsProcess(url: str, kind: UrlType, args: list, settings: Settings):
+        """Worker method for downloading a particular Url, used in multiprocessing."""
         p = multiprocessing.current_process()
 
         baseCommand   = "wget --no-cache"
@@ -423,13 +479,11 @@ class Downloader:
         if not settings.ForceDownload:
             baseCommand += f" {timestamp} "
 
-        #logging.debug(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {inputFile} {args}")
-        #os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {inputFile} {args}")
+        #print(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
+        os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
 
-        #print(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {urls} {args}")
-        os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {urls} {args}")
-
-    def CustomArguments(settings) -> list:
+    def CustomArguments(settings: Settings) -> list:
+        """Creates custom Wget arguments based on the Settings provided."""
         arguments = []
 
         if settings.AuthNoChallege:
@@ -454,10 +508,13 @@ class Downloader:
         return arguments
 
 class Index:
-    def __init__(self, path):
+    """Represents an Index file."""
+    def __init__(self, path: str):
+        """Initialise an Index file with a path."""
         self._path = path
 
     def Read(self):
+        """Read and decode the contents of the file."""
         contents = []
         self._lines = []
 
@@ -468,6 +525,7 @@ class Index:
             self._lines.append(line.decode().rstrip())
 
     def GetPackages(self) -> list:
+        """Get a list of all Packages listed in the file."""
         packages = []
         package = dict()
 

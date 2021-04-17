@@ -1,3 +1,5 @@
+"""Python Debian mirroring tool."""
+
 import sys
 import logging
 import click
@@ -5,11 +7,8 @@ import os
 import time
 from pathlib import Path
 import multiprocessing 
-import re
 import math
-import codecs
 from shutil import copyfile
-from itertools import product
 import tqdm
 import datetime
 
@@ -22,23 +21,22 @@ from classes import (
     Index,
 )
 
-from helpers import (
-    SanitiseUri,
-    WaitForThreads
-)
-
-CONFIG_FILE = "refrapt.cfg"
+from helpers import SanitiseUri
 
 settings = Settings()
 
-sources = []
+sources = [] # type: List[Source]
 cleanList = dict()
-rmDirs = []
-rmFiles = []
+rmDirs = [] # type: List[str]
+rmFiles = [] # type: List[str]
 clearSize = 0
 
 @click.command()
-def main():
+@click.option("--conf", default="/etc/apt/refrapt.conf", help="Path to configuration file.", type=click.STRING)
+@click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files.", type=click.BOOL)
+def refrapt(conf: str, test: bool):
+    """A tool to mirror Debian repositories for use as a local mirror."""
+
     global sources
     global cleanList
     global rmDirs
@@ -50,16 +48,22 @@ def main():
     configData = []
     indexUrls = []
 
+    logging.basicConfig(level=settings.LogLevel)
+
     startTime = time.perf_counter()
+    settings.Test = test
+
+    if settings.Test:
+        logging.info("## Running in Test mode. Main download will not occur! ##\n")
 
     try:
         # Read the configuration file
-        with open (CONFIG_FILE) as f:
+        with open (conf) as f:
             configData = list(filter(None, f.read().splitlines()))
         
         logging.debug(f"Read {len(configData)} lines from config")
     except FileNotFoundError:
-        logging.critical("Config file not found!")
+        logging.critical(f"Config file not found! Path: {conf}")
         sys.exit()
 
     # Parse the configuration file
@@ -80,8 +84,6 @@ def main():
     logging.info(f"Removing previous log files...")
     for item in os.listdir(settings.VarPath):
         os.remove(f"{settings.VarPath}/{item}")
-
-    sys.exit()
 
     logging.info(f"Processing {len(sources)} sources...")
 
@@ -145,16 +147,18 @@ def main():
     logging.info(f"Compiled a list of {len(filesToDownload)} Binary and Source files of size {downloadSize} for download")
 
     os.chdir(settings.MirrorPath)
-    Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive, settings)
+    if not settings.Test:
+        Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive, settings)
 
     # 6. Copy Skel to Main Archive
-    print()
-    logging.info(f"Copying Skel to Mirror")
-    for indexUrl in tqdm.tqdm(cleanList, unit=" files"):
-        if os.path.isfile(f"{settings.SkelPath}/{SanitiseUri(indexUrl)}"):
-            path = Path(f"{settings.MirrorPath}/{SanitiseUri(indexUrl)}")
-            os.makedirs(path.parent.absolute(), exist_ok=True)
-            copyfile(f"{settings.SkelPath}/{SanitiseUri(indexUrl)}", f"{settings.MirrorPath}/{SanitiseUri(indexUrl)}")
+    if not settings.Test:
+        print()
+        logging.info(f"Copying Skel to Mirror")
+        for indexUrl in tqdm.tqdm(cleanList, unit=" files"):
+            if os.path.isfile(f"{settings.SkelPath}/{SanitiseUri(indexUrl)}"):
+                path = Path(f"{settings.MirrorPath}/{SanitiseUri(indexUrl)}")
+                os.makedirs(path.parent.absolute(), exist_ok=True)
+                copyfile(f"{settings.SkelPath}/{SanitiseUri(indexUrl)}", f"{settings.MirrorPath}/{SanitiseUri(indexUrl)}")
 
     # 7. Remove any unused files
     Clean()
@@ -163,12 +167,26 @@ def main():
     logging.info(f"Refrapt completed in {datetime.timedelta(seconds=round(time.perf_counter() - startTime))}")
 
 def Clean():
+    """Clean any files or directories that are not used.
+    
+       Determination of whether a file or directory is used
+       is based on whether each of the files and directories
+       within the path of a given Source were added to the
+       cleanList[] variable. If they were not, that means
+       based on the current configuration file, the items
+       are not required.
+    """
+
     for source in [x for x in sources if x.Clean]:
         directory = SanitiseUri(source.Uri)
         if os.path.isdir(directory) and not os.path.islink(directory):
             ProcessDirectory(directory)
 
     if clearSize == 0:
+        return
+
+    if settings.Test:
+        logging.info(f"Found {ConvertSize(clearSize)} in {len(rmFiles)} files and {len(rmDirs)} directories that could be freed.")
         return
 
     logging.info(f"{ConvertSize(clearSize)} in {len(rmFiles)} files and {len(rmDirs)} directories will be freed...")
@@ -179,7 +197,8 @@ def Clean():
     for dir in tqdm.tqdm(rmDirs, unit=" dirs", desc="Dirs "):
         os.rmdir(dir)
 
-def ProcessDirectory(directory) -> bool:
+def ProcessDirectory(directory: str) -> bool:
+    """Recursively check whether a directory and all of its contents and eligible for removal."""
     required = False
 
     if directory in cleanList:
@@ -200,7 +219,8 @@ def ProcessDirectory(directory) -> bool:
 
     return required
 
-def ProcessFile(file) -> bool:
+def ProcessFile(file: str) -> bool:
+    """Check whether a file is eligible for removal."""
     global clearSize
 
     if file in cleanList:
@@ -212,7 +232,8 @@ def ProcessFile(file) -> bool:
     return False
 
 
-def CalculateDownloadSize(files) -> str:
+def CalculateDownloadSize(files: list) -> str:
+    """Calculates the total size of a given listing of files."""
     size = 0
     for file in files:
         size += file
@@ -220,6 +241,7 @@ def CalculateDownloadSize(files) -> str:
     return ConvertSize(size)
 
 def DecompressReleaseFiles():
+    """Decompresses the Release and Source files."""
     releaseFiles = []
     for source in sources:
         releaseFiles += source.GetReleaseFiles()
@@ -231,17 +253,25 @@ def DecompressReleaseFiles():
         for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, releaseFiles), total=len(releaseFiles), unit=" file"):
             pass
 
-def UnzipFile(file):
+def UnzipFile(file: str):
+    """Determines the file format and unzips the given file."""
+    if os.path.isfile(f"{file}.gz"):
+        os.system(f"gunzip < {file}.gz > {file}")
+    elif os.path.isfile(f"{file}.xz"):
+        os.system(f"xz -d {file}.xz > {file}")
+    elif os.path.isfile(f"{file}.bz2"):
+        os.system(f"bzip2 -d {file}.bz2 > {file}")
+    else:
+        logging.warn(f"File '{file}' has an unsupported compression format")
 
-    # for file in files:
-        if os.path.isfile(f"{file}.gz"):
-            os.system(f"gunzip < {file}.gz > {file}")
-        elif os.path.isfile(f"{file}.xz"):
-            os.system(f"xz -d {file}.xz > {file}")
-        elif os.path.isfile(f"{file}.bz2"):
-            os.system(f"bzip2 -d {file}.bz2 > {file}")
-
-def ProcessIndex(uri, index) -> tuple[list, int]:
+def ProcessIndex(uri: str, index: int) -> tuple[list, int]:
+    """Processes each package listed in the Index file.
+    
+       For each Package that is found in the Index file,
+       it is checked to see whether the file exists in the
+       local mirror, and if not, adds it to the collection
+       for download.
+    """
     packageDownloads = []
 
     path = SanitiseUri(uri)
@@ -302,7 +332,20 @@ def ProcessIndex(uri, index) -> tuple[list, int]:
 
     return packageDownloads
 
-def NeedUpdate(path, size: int) -> bool:
+def NeedUpdate(path: str, size: int) -> bool:
+    """Determine whether a file needs updating.
+    
+       If the file exists on disk, its size is compared 
+       to that listed in the Package. The result of the 
+       comparison determines whether the file should be 
+       downloaded.
+
+       If the file does not exist, it must be downloaded.
+
+       Function can be forced to alwasy return True
+       in the event that the correct setting is applied
+       in the Configuration file.
+    """
     # Realistically, this is a bad check, as the size
     # could remain the same, but source may have changed.
     # Allow the user to force an update via Settings
@@ -315,7 +358,8 @@ def NeedUpdate(path, size: int) -> bool:
     else:
         return True
 
-def ConvertSize(bytes) -> str:
+def ConvertSize(bytes: int) -> str:
+    """Convert a number of bytes into a number with a suitable unit."""
     if bytes == 0:
         return "0B"
 
@@ -325,11 +369,10 @@ def ConvertSize(bytes) -> str:
     s = round(bytes / p, 2)
     return "%s %s" % (s, sizeName[i])
 
-def GetSources(configData) -> list:
-    sourceList = [x for x in configData if x.startswith("deb")]
-
+def GetSources(configData: str) -> list:
+    """Determine the Sources listed in the Configuration file."""
     sources = []
-    for line in sourceList:
+    for line in  [x for x in configData if x.startswith("deb")]:
         sources.append(Source(line, settings.Architecture))
 
     for line in [x for x in configData if x.startswith("clean")]:
@@ -342,5 +385,4 @@ def GetSources(configData) -> list:
     return sources
 
 if __name__ == "__main__":
-    logging.basicConfig(level=settings.LogLevel)
-    main()
+    refrapt()

@@ -5,7 +5,9 @@ import multiprocessing
 import sys
 import math
 import re
-from itertools import product
+import itertools
+from functools import partial
+import tqdm
 
 from helpers import (
     SanitiseUri,
@@ -32,7 +34,9 @@ class Settings:
             "proxyPass"         : None,
             "limitRate"         : "500m", # Wget syntax
             "language"          : "en",   # TODO : Default to locale
-            "forceUpdate"       : False,
+            "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
+            "forceDownload"     : False,  # Use this to force Wget to redownload the file, even if the timestamp of the file matches that on the server. Use this in the event of an interrupted download
+            "logLevel"          : "INFO"
         }
 
     def Parse(self, config):
@@ -127,8 +131,16 @@ class Settings:
         return self._settings["language"]
 
     @property
-    def ForceUpdate(self) -> str:
+    def ForceUpdate(self) -> bool:
         return self._settings["forceUpdate"]
+
+    @property
+    def ForceDownload(self) -> bool:
+        return self._settings["forceDownload"]
+
+    @property
+    def LogLevel(self) -> str:
+        return logging._nameToLevel[self._settings["logLevel"]]
 
 
 class SourceType(Enum):
@@ -153,6 +165,7 @@ class Source:
         self._uri = None
         self._distribution = None
         self._components = []
+        self._clean = True
 
         # Break down the line into its parts
         elements = line.split(" ")
@@ -367,87 +380,54 @@ class Source:
     def Architectures(self) -> list:
         return self._architectures
 
+    @property
+    def Clean(self) -> bool:
+        return self._clean
+
+    @Clean.setter
+    def Clean(self, value):
+        self._clean = value
+
 class Downloader:
     def Download(urls, kind, settings):
         if not urls:
-            logging.debug("No files to download")
+            logging.info("No files to download")
             return
-
-        threadCount = settings.Threads
-
-        if len(urls) < threadCount:
-            threadCount = len(urls)
 
         arguments = Downloader.CustomArguments(settings)
 
-        logging.info(f"Downloading {len(urls)} {kind.name} files using {threadCount} threads...\n")
+        logging.info(f"Downloading {len(urls)} {kind.name} files...")
 
-        # with multiprocessing.Pool(threadCount) as p:
-        #     p.starmap(Downloader.DownloadUrlsProcess, product((urls,), (kind.name,), (0,), (arguments,), (settings,)))
+        with multiprocessing.Pool(settings.Threads) as pool:
+            downloadFunc = partial(Downloader.DownloadUrlsProcess, kind=kind.name, args=arguments, settings=settings)
+            for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file"):
+                pass
 
+    def DownloadUrlsProcess(urls, kind, args, settings):
+        p = multiprocessing.current_process()
 
-
-
-        i = 0
-        processes = []
-
-        threadJobs = [[] for i in range(threadCount)]
-
-        while urls:
-            for x in range(threadCount):
-                if not urls:
-                    break
-                else:
-                    threadJobs[x].append(urls[0])
-                    del urls[0] 
-
-        for job in threadJobs:
-            with open (settings.VarPath + f"/{kind.name}-urls.{i}", "w") as f:
-                for url in job:
-                    f.write(url + "\n")
-
-            p = multiprocessing.Process(target=Downloader.DownloadUrlsProcess, args=(job, kind.name, i, arguments, settings))
-            p.daemon = True
-            p.start()
-
-            processes.append(p)
-
-            i += 1
-
-
-
-
-
-        # chunkSize = math.ceil(len(urls) / threadCount)
-
-        # while urls:
-        #     threadUrls = urls[0:chunkSize]
-        #     del urls[0:chunkSize]
-
-        #     with open (settings.VarPath + f"/{kind.name}-urls.{i}", "w") as f:
-        #         for url in threadUrls:
-        #             f.write(url + "\n")
-
-        #     p = multiprocessing.Process(target=Downloader.DownloadUrlsProcess, args=(threadUrls, kind.name, i, arguments, settings))
-        #     p.daemon = True
-        #     p.start()
-
-        #     processes.append(p)
-
-        #     i += 1
-
-        WaitForThreads(processes)
-
-    def DownloadUrlsProcess(urls, kind, index, args, settings):
-        baseCommand   = "wget --no-cache -N"
+        baseCommand   = "wget --no-cache"
+        timestamp     = "-N" 
         rateLimit     = f"--limit-rate={settings.LimitRate}"
         retries       = "-t 5"
         recursiveOpts = "-r -l inf"
-        logFile       = f"-o {settings.VarPath}/{kind}-log.{index}"
-        inputFile     = f"-i {settings.VarPath}/{kind}-urls.{index}"
+        logFile       = f"-a {settings.VarPath}/{kind}-log.{p._identity[0]}"
 
-        logging.debug(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {inputFile} {args}")
+        # With Timestamps enabled (-N), if a file did not fully download, and you attempt to redownload again,
+        # Wget will check the timestamps, and possibly determine that nothing has changed. This would leave you with
+        # a partial file which won't get updated until the file on the server gets updated!
+        # By default, timestampping will save Wget re-downloading a file that it does not need to, but
+        # if the option is set by the user, timestamps should be ignored to allow Wget to redownload the
+        # file from scratch
+
+        if not settings.ForceDownload:
+            baseCommand += f" {timestamp} "
+
+        #logging.debug(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {inputFile} {args}")
         #os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {inputFile} {args}")
+
+        #print(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {urls} {args}")
+        os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {urls} {args}")
 
     def CustomArguments(settings) -> list:
         arguments = []

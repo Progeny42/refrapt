@@ -30,12 +30,16 @@ class Settings:
             "httpsProxy"        : None,
             "proxyUser"         : None,
             "proxyPass"         : None,
+            "certificate"       : None,
+            "caCertificate"     : None,
+            "privateKey"        : None,
             "limitRate"         : "500m", # Wget syntax
             "language"          : "en",   # TODO : Default to locale
             "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
             "forceDownload"     : False,  # Use this to force Wget to redownload the file, even if the timestamp of the file matches that on the server. Use this in the event of an interrupted download
             "logLevel"          : "INFO",
-            "test"              : False
+            "test"              : False,
+            "byHash"            : False
         }
 
     def Parse(self, config: str):
@@ -151,6 +155,21 @@ class Settings:
         return self._settings["proxyPass"]
 
     @property
+    def Certificate(self) -> str:
+        """Get the certificate setting for SSL."""
+        return self._settings["certificate"]
+
+    @property
+    def CaCertificate(self) -> str:
+        """Get the ca certificate setting for SSL."""
+        return self._settings["caCertificate"]
+
+    @property
+    def PrivateKey(self) -> str:
+        """Get the private key setting for SSL."""
+        return self._settings["privateKey"]
+
+    @property
     def LimitRate(self) -> str:
         """Get the value of the --limit-rate setting used for Wget."""
         return self._settings["limitRate"]
@@ -174,6 +193,11 @@ class Settings:
     def LogLevel(self) -> str:
         """Get the log level used for application logging."""
         return logging._nameToLevel[self._settings["logLevel"]]
+
+    @property
+    def ByHash(self) -> bool:
+        """Get whether the by-hash directories should be included in downloads."""
+        return self._settings["byHash"]
 
 
 class SourceType(Enum):
@@ -204,6 +228,10 @@ class Source:
         self._distribution = None
         self._components = [] # type: list[str]
         self._clean = True
+
+        # Remove any inline comments
+        if "#" in line:
+            line = line[0:line.index("#")]
 
         # Break down the line into its parts
         elements = line.split(" ")
@@ -274,8 +302,11 @@ class Source:
                         indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages.gz")
                         indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages.bz2")
                         indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages.xz")
-                        
+                        indexes.append(baseUrl + component + "/cnf/Commands-" + architecture + ".xz")
+                        indexes.append(baseUrl + component + "/i18n/cnf/Commands-" + architecture + ".xz")
+
                     indexes.append(baseUrl + component + "/i18n/Index")
+                    
 
         elif self._sourceType == SourceType.Src:
             # Source Files
@@ -324,7 +355,7 @@ class Source:
     def GetTranslationIndexes(self, settings: Settings) -> list:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
-            return
+            return []
         
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
 
@@ -338,7 +369,7 @@ class Source:
     def GetDep11Files(self, settings: Settings) -> list:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
-            return
+            return []
         
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
         releaseUri = baseUrl + "Release"
@@ -347,7 +378,7 @@ class Source:
         dep11Files = []
 
         for component in self._components:
-            dep11Files += self.__ProcessLine(releasePath, IndexType.Dep11, baseUrl, "", component)
+            dep11Files += self.__ProcessLine(releasePath, IndexType.Dep11, baseUrl, settings, "", component)
 
         return dep11Files
 
@@ -364,11 +395,11 @@ class Source:
         if not os.path.isfile(indexPath):
             releaseUri = url + "Release"
             releasePath = settings.SkelPath + "/" + SanitiseUri(releaseUri)
-            return self.__ProcessLine(releasePath, IndexType.Release, url, "", component)
+            return self.__ProcessLine(releasePath, IndexType.Release, url, settings, "", component)
         else:
-            return self.__ProcessLine(indexPath, IndexType.Index, indexUri, baseUri, "")
+            return self.__ProcessLine(indexPath, IndexType.Index, indexUri, settings, baseUri, "")
 
-    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
+    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, settings: Settings, baseUri: str = "", component: str = "") -> list:
         """Parses an Index file for all filenames."""
         checksums = False
 
@@ -376,6 +407,10 @@ class Source:
 
         with open (file) as f:
             for line in f:
+                if "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line:
+                    checksumType = line
+                    checksumType = checksumType.replace(":", "").strip()
+
                 if checksums:
                     if re.search("^ +(.*)$", line):
                         parts = list(filter(None, line.split(" ")))
@@ -388,15 +423,20 @@ class Source:
                             logging.warn(f"Malformed checksum line '{line}' in {indexUri}")
                             continue
 
+                        checksum = parts[0].strip()
                         filename = parts[2].rstrip()
 
                         if indexType == IndexType.Release:
                             if re.match(f"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
                                 indexes.append(indexUri + filename)
+                                if settings.ByHash:
+                                    indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
                         elif indexType == IndexType.Dep11:
                             for arch in self._architectures:
                                 if re.match(f"^{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
                                     indexes.append(indexUri + filename)
+                            if settings.ByHash:
+                                    indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
                         else:
                             indexes.append(baseUri + filename)                           
                     else:
@@ -492,6 +532,13 @@ class Downloader:
             arguments.append("--no-check-certificate")
         if settings.Unlink:
             arguments.append("--unlink")
+
+        if settings.Certificate:
+            arguments.append(f"--certificate={settings.Certificate}")
+        if settings.CaCertificate:
+            arguments.append(f"--ca-certificate={settings.CaCertificate}")
+        if settings.PrivateKey:
+            arguments.append(f"--privateKey={settings.PrivateKey}")
 
         if settings.UseProxy:
             arguments.append("-e use_proxy=yes")

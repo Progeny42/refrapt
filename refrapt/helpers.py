@@ -8,8 +8,8 @@ def SanitiseUri(uri: str) -> str:
     """Sanitise a Uri so it is suitable for filesystem use."""
     uri = re.sub("^(\w+)://", "", uri)
 
-    if '@' in uri:
-        uri = re.sub("^([^@]+)?@?/", "", uri)
+    # if '@' in uri:
+    #     uri = re.sub("^([^@]+)?@?/", "", uri)
 
     uri = re.sub(":\d+", "", uri) # Port information
    

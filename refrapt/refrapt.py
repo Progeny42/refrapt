@@ -321,7 +321,7 @@ def ProcessIndex(uri: str, index: int) -> tuple[list, int]:
                             size = int(sourceFile[1])
                             fileName = sourceFile[2]
 
-                            cleanList[f"{path}/{directory}/{filename}"] = True
+                            cleanList[f"{path}/{directory}/{fileName}"] = True
 
                             allFile.write(f"{path}/{directory}/{fileName}\n")
                             md5File.write(f"{md5} {path}/{directory}/{fileName}\n")

@@ -34,6 +34,7 @@ rmFiles = [] # type: List[str]
 clearSize = 0
 
 @click.command()
+@click.version_option(pkg_resources.require("refrapt")[0].version)
 @click.option("--conf", default="/etc/apt/refrapt.conf", help="Path to configuration file.", type=click.STRING)
 @click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files.", type=click.BOOL)
 def refrapt(conf: str, test: bool):

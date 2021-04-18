@@ -326,8 +326,6 @@ class Downloader:
 
         filename = f"{logPath}/Download-lock.{p._identity[0]}"
 
-        multiLogger.
-
         with FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:
                 f.write(url)

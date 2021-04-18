@@ -14,15 +14,16 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Progeny42/Refrapt",
     author="Progeny42",
-    packages=["refrapt"],
-    package_data={
-        "refrapt": ["refrapt.conf"]
-    },
-    py_modules=[
-        'refrapt', 
-        'classes', 
-        'helpers'
-    ],
+    packages=find_packages(),
+    # package_data={
+    #     "refrapt": ["refrapt.conf"]
+    # },
+    # py_modules=[
+    #     'refrapt', 
+    #     'classes', 
+    #     'helpers',
+    #     'settings'
+    # ],
     install_requires=[
         'Click >= 7.1.2',
         'Colorama >= 0.4.4',

@@ -26,7 +26,6 @@ setup(
         'Click >= 7.1.2',
         'Colorama >= 0.4.4',
         'tqdm >= 4.60.0',
-        'gunzip >= 0.1.10',
         'wget >= 3.2',
         'filelock >= 3.0.12'
     ],

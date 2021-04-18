@@ -9,10 +9,13 @@ import time
 from pathlib import Path
 import multiprocessing 
 import math
-from shutil import copyfile
+import shutil
 import tqdm
 import datetime
 import pkg_resources
+import gzip
+import lzma
+import bz2
 
 from classes import (
     Source,
@@ -174,7 +177,7 @@ def refrapt(conf: str, test: bool):
             if os.path.isfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"):
                 path = Path(f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
                 os.makedirs(path.parent.absolute(), exist_ok=True)
-                copyfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}", f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
+                shutil.copyfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}", f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
 
     # 7. Remove any unused files
     Clean()
@@ -323,12 +326,19 @@ def DecompressReleaseFiles():
 
 def UnzipFile(file: str):
     """Determines the file format and unzips the given file."""
+
     if os.path.isfile(f"{file}.gz"):
-        os.system(f"gunzip < {file}.gz > {file}")
+        with gzip.open(f"{file}.gz", "rb") as f:
+            with open(file, "wb") as out:
+                shutil.copyfileobj(f, out)
     elif os.path.isfile(f"{file}.xz"):
-        os.system(f"xz -d {file}.xz > {file}")
+        with lzma.open(f"{file}.xz", "rb") as f:
+            with open(file, "wb") as out:
+                shutil.copyfileobj(f, out)
     elif os.path.isfile(f"{file}.bz2"):
-        os.system(f"bzip2 -d {file}.bz2 > {file}")
+        with bz2.open(f"{file}.bz2", "rb") as f:
+            with open(file, "wb") as out:
+                shutil.copyfileobj(f, out)
     else:
         logger.warn(f"File '{file}' has an unsupported compression format")
 

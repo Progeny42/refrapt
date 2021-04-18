@@ -7,9 +7,9 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='Refrapt',
-    version='0.1.0',
+    version='0.1.1',
     description='A tool to mirror Debian repositories for use as a local mirror.',
-    python_requires='>=3.9',
+    python_requires='>=3.8',
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/Progeny42/Refrapt",

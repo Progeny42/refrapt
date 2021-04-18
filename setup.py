@@ -24,9 +24,10 @@ setup(
         'Colorama',
         'tqdm',
         'gunzip',
-        'wget'
+        'wget',
+        'filelock'
     ],
-    keywords=['Mirror'. 'Debian', 'Repository']
+    keywords=['Mirror', 'Debian', 'Repository'],
     entry_points='''
         [console_scripts]
         refrapt=refrapt:refrapt

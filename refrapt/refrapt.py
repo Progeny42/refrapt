@@ -80,6 +80,18 @@ def refrapt(conf: str, test: bool):
     # Change to the Skel directory for working repository structure
     os.chdir(settings.SkelPath)
 
+    # Check for any "-lock" files.
+    for file in os.listdir(settings.VarPath):
+        if "Download-lock" in file:
+            # A download was in progress and interrupted. This means a
+            # partial download will be sitting on the drive. Remove
+            # it to guarantee that it will be fully downloaded.
+            with open(f"{settings.VarPath}/{file}") as f:
+                uri = f.readline()
+                uri = SanitiseUri(uri)
+                logging.info(f"Removed incomplete download {uri}")
+                os.remove(f"{settings.MirrorPath}/{uri}")
+
     # Delete existing log files
     logging.info(f"Removing previous log files...")
     for item in os.listdir(settings.VarPath):
@@ -342,7 +354,7 @@ def NeedUpdate(path: str, size: int) -> bool:
 
        If the file does not exist, it must be downloaded.
 
-       Function can be forced to alwasy return True
+       Function can be forced to always return True
        in the event that the correct setting is applied
        in the Configuration file.
     """

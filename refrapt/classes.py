@@ -8,6 +8,7 @@ import sys
 import re
 from functools import partial
 import tqdm
+from filelock import FileLock
 
 from helpers import SanitiseUri
 
@@ -36,7 +37,6 @@ class Settings:
             "limitRate"         : "500m", # Wget syntax
             "language"          : "en",   # TODO : Default to locale
             "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
-            "forceDownload"     : False,  # Use this to force Wget to redownload the file, even if the timestamp of the file matches that on the server. Use this in the event of an interrupted download
             "logLevel"          : "INFO",
             "test"              : False,
             "byHash"            : False
@@ -183,11 +183,6 @@ class Settings:
     def ForceUpdate(self) -> bool:
         """Get whether updates of files should be forced."""
         return self._settings["forceUpdate"]
-
-    @property
-    def ForceDownload(self) -> bool:
-        """Get whether downloads of files should be forced."""
-        return self._settings["forceDownload"]
 
     @property
     def LogLevel(self) -> str:
@@ -502,7 +497,7 @@ class Downloader:
         """Worker method for downloading a particular Url, used in multiprocessing."""
         p = multiprocessing.current_process()
 
-        baseCommand   = "wget --no-cache"
+        baseCommand   = "wget --no-cache -N"
         timestamp     = "-N" 
         rateLimit     = f"--limit-rate={settings.LimitRate}"
         retries       = "-t 5"
@@ -516,11 +511,17 @@ class Downloader:
         # if the option is set by the user, timestamps should be ignored to allow Wget to redownload the
         # file from scratch
 
-        if not settings.ForceDownload:
-            baseCommand += f" {timestamp} "
-
         #print(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
-        os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
+
+        filename = f"{settings.VarPath}/Download-lock.{p._identity[0]}"
+
+        with FileLock(f"{filename}.lock"):
+            with open(filename, "w") as f:
+                f.write(url)
+
+            os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
+
+            os.remove(filename)
 
     def CustomArguments(settings: Settings) -> list:
         """Creates custom Wget arguments based on the Settings provided."""

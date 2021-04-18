@@ -12,6 +12,8 @@ from filelock import FileLock
 
 from helpers import SanitiseUri
 
+logger = logging.getLogger(__name__)
+
 class Settings:
     def __init__(self):
         """Initialises a new Settings class."""
@@ -49,10 +51,18 @@ class Settings:
                 key = line.split("set ")[1].split("=")[0].strip()
                 
                 if key in self._settings:
-                    self._settings[key] = line.split("=")[1].strip()
-                    logging.debug(f"Parsed setting: {key} = {self._settings.get(key)}")
+                    value = line.split("=")[1].strip().split(" ")[0] # Allow for inline comments, but strip them here
+
+                    if value.isdigit():
+                        self._settings[key] = int(value)
+                    elif "true" in value.lower() or "false" in value.lower():
+                        self._settings[key] = value.lower() == "true"
+                    else:
+                        self._settings[key] = value
+
+                    logger.debug(f"Parsed setting: {key} = {self._settings.get(key)}")
                 else:
-                    logging.warn(f"Unknown setting in configuration file '{line}'")
+                    logger.warn(f"Unknown setting in configuration file '{line}'")
 
     @property
     def Test(self) -> bool:
@@ -186,7 +196,7 @@ class Settings:
 
     @property
     def LogLevel(self) -> str:
-        """Get the log level used for application logging."""
+        """Get the log level used for application logger."""
         return logging._nameToLevel[self._settings["logLevel"]]
 
     @property
@@ -253,12 +263,12 @@ class Source:
         self._distribution  = elements[elementIndex + 1]
         self._components    = elements[elementIndex + 2:]
 
-        logging.debug("Source")
-        logging.debug(f"\tKind:         {self._sourceType}")
-        logging.debug(f"\tArch:         {self._architectures}")
-        logging.debug(f"\tUri:          {self._uri}")
-        logging.debug(f"\tDistribution: {self._distribution}")
-        logging.debug(f"\tComponents:   {self._components}")
+        logger.debug("Source")
+        logger.debug(f"\tKind:         {self._sourceType}")
+        logger.debug(f"\tArch:         {self._architectures}")
+        logger.debug(f"\tUri:          {self._uri}")
+        logger.debug(f"\tDistribution: {self._distribution}")
+        logger.debug(f"\tComponents:   {self._components}")
 
     def GetIndexes(self, settings: Settings) -> list:
         """Get a list of all Indexes for the Source."""
@@ -415,7 +425,7 @@ class Source:
                         # parts[2] = filename
 
                         if not len(parts) == 3:
-                            logging.warn(f"Malformed checksum line '{line}' in {indexUri}")
+                            logger.warn(f"Malformed checksum line '{line}' in {indexUri}")
                             continue
 
                         checksum = parts[0].strip()
@@ -481,12 +491,12 @@ class Downloader:
     def Download(urls: list, kind: UrlType, settings: Settings):
         """Download a list of files of a specific type"""
         if not urls:
-            logging.info("No files to download")
+            logger.info("No files to download")
             return
 
         arguments = Downloader.CustomArguments(settings)
 
-        logging.info(f"Downloading {len(urls)} {kind.name} files...")
+        logger.info(f"Downloading {len(urls)} {kind.name} files...")
 
         with multiprocessing.Pool(settings.Threads) as pool:
             downloadFunc = partial(Downloader.DownloadUrlsProcess, kind=kind.name, args=arguments, settings=settings)

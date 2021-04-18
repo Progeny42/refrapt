@@ -14,18 +14,28 @@ setup(
     url="https://github.com/Progeny42/Refrapt",
     author="Progeny42",
     packages=find_packages(),
+    package_data={
+        "refrapt": ["refrapt.conf"]
+    },
     py_modules=[
         'refrapt', 
         'classes', 
         'helpers'
     ],
     install_requires=[
-        'Click',
-        'Colorama',
-        'tqdm',
-        'gunzip',
-        'wget',
-        'filelock'
+        'Click >= 7.1.2',
+        'Colorama >= 0.4.4',
+        'tqdm >= 4.60.0',
+        'gunzip >= 0.1.10',
+        'wget >= 3.2',
+        'filelock >= 3.0.12'
+    ],
+    classifiers=[
+        "Development Status :: 3 - Alpha",
+        "Operating System :: Microsoft :: Windows :: Windows 10",
+        "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: Implementation",
+        "Topic :: System :: Archiving :: Mirroring"
     ],
     keywords=['Mirror', 'Debian', 'Repository'],
     entry_points='''

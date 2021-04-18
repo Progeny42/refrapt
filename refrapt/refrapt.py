@@ -27,10 +27,10 @@ from settings import Settings
 
 logger = logging.getLogger(__name__)
 
-sources = [] # type: List[Source]
+sources = [] # type: list[Source]
 cleanList = dict()
-rmDirs = [] # type: List[str]
-rmFiles = [] # type: List[str]
+rmDirs = [] # type: list[str]
+rmFiles = [] # type: list[str]
 clearSize = 0
 
 @click.command()
@@ -49,7 +49,6 @@ def refrapt(conf: str, test: bool):
     startTime = time.perf_counter()
 
     clearSize = 0
-    indexUrls = []
 
     ConfigureLogger()
 
@@ -145,7 +144,7 @@ def refrapt(conf: str, test: bool):
 
     print()
     logger.info(f"Building file list...")
-    filesToDownload = list([tuple()])
+    filesToDownload = list([tuple()]) # type: list[tuple[list,int]]
     filesToDownload.clear()
     for source in tqdm.tqdm(sources, position=0, unit=" source", desc="Sources "):
         releaseFiles = source.GetReleaseFiles()
@@ -155,7 +154,7 @@ def refrapt(conf: str, test: bool):
             value = file[len(SanitiseUri(key)):]
             filesToDownload += ProcessIndex(key, value)
 
-    for download in filesToDownload:
+    for download, size in filesToDownload:
         cleanList[SanitiseUri(download[0])] = True
 
     # 5. Perform the main download of Binary and Source files
@@ -333,7 +332,7 @@ def UnzipFile(file: str):
     else:
         logger.warn(f"File '{file}' has an unsupported compression format")
 
-def ProcessIndex(uri: str, index: int) -> tuple[list, int]:
+def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
     """Processes each package listed in the Index file.
     
        For each Package that is found in the Index file,
@@ -345,10 +344,10 @@ def ProcessIndex(uri: str, index: int) -> tuple[list, int]:
 
     path = SanitiseUri(uri)
 
-    index = Index(f"{Settings.SkelPath()}/{path}/{index}")
-    index.Read()
+    indexFile = Index(f"{Settings.SkelPath()}/{path}/{index}")
+    indexFile.Read()
 
-    packages = index.GetPackages()
+    packages = indexFile.GetPackages()
 
     mirror = Settings.MirrorPath() + "/" + path
 
@@ -381,7 +380,7 @@ def ProcessIndex(uri: str, index: int) -> tuple[list, int]:
                 # Sources Index
                 for key, value in package.items():
                     if "Files" in key:
-                        files = list(filter(None, value.splitlines())) 
+                        files = list(filter(None, value.splitlines())) # type: list[str]
                         for file in files:
                             directory = package["Directory"]
                             sourceFile = file.split(" ")
@@ -438,7 +437,7 @@ def ConvertSize(bytes: int) -> str:
     s = round(bytes / p, 2)
     return "%s %s" % (s, sizeName[i])
 
-def GetSources(configData: str) -> list:
+def GetSources(configData: list) -> list:
     """Determine the Sources listed in the Configuration file."""
     sources = []
     for line in  [x for x in configData if x.startswith("deb")]:

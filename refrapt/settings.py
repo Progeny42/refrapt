@@ -34,7 +34,7 @@ class Settings:
     }
 
     @staticmethod
-    def Parse(config: str):
+    def Parse(config: list):
         """Parse the configuration file and set the settings defined."""
         for line in config:
             if line.startswith("set"):
@@ -57,7 +57,7 @@ class Settings:
     @staticmethod
     def Test() -> bool:
         """Get whether Test mode is enabled."""
-        return Settings._settings["test"]
+        return bool(Settings._settings["test"])
 
     @staticmethod
     def EnableTest():
@@ -67,127 +67,109 @@ class Settings:
     @staticmethod
     def Architecture() -> str:
         """Get the default Architecture."""
-        return Settings._settings["architecture"]
-
+        return str(Settings._settings["architecture"])
 
     @staticmethod
     def MirrorPath() -> str:
         """Get the path to the /mirror directory."""
-        return Settings._settings["rootPath"] + os.sep + Settings._settings["mirrorPath"]
-
+        return str(Settings._settings["rootPath"]) + os.sep + str(Settings._settings["mirrorPath"])
 
     @staticmethod
     def SkelPath() -> str:
         """Get the path to the /skel directory."""
-        return Settings._settings["rootPath"] + os.sep + Settings._settings["skelPath"]
-
+        return str(Settings._settings["rootPath"]) + os.sep + str(Settings._settings["skelPath"])
 
     @staticmethod
     def VarPath() -> str:
         """Get the path to the /var directory."""
-        return Settings._settings["rootPath"] + os.sep + Settings._settings["varPath"]
-
+        return str(Settings._settings["rootPath"]) + os.sep + str(Settings._settings["varPath"])
 
     @staticmethod
     def Contents() -> bool:
         """Get whether Contents files should be included."""
-        return Settings._settings["contents"]
-
+        return bool(Settings._settings["contents"])
 
     @staticmethod
     def Threads() -> int:
         """Get the number of threads to use for multiprocessing tasks."""
-        return Settings._settings["threads"]
+        return int(str(Settings._settings["threads"]))
         
-
     @staticmethod
     def AuthNoChallege() -> bool:
         """Get whether Wget should use the --auth-no-challenge parameter."""
-        return Settings._settings["authNoChallenge"]
-
+        return bool(Settings._settings["authNoChallenge"])
 
     @staticmethod
     def NoCheckCertificate() -> bool:
         """Get whether Wget should use the --no-check-certificate parameter."""
-        return Settings._settings["noCheckCertificate"]
-
+        return bool(Settings._settings["noCheckCertificate"])
 
     @staticmethod
     def Unlink() -> bool:
         """Get whether Wget should use the --unlink parameter."""
-        return Settings._settings["unlink"]
-
+        return bool(Settings._settings["unlink"])
 
     @staticmethod
     def UseProxy() -> bool:
         """Get whether Wget should use the -e use_proxy=yes parameter."""
-        return Settings._settings["useProxy"]
-
+        return bool(Settings._settings["useProxy"])
 
     @staticmethod
     def HttpProxy() -> str:
         """Get the httpProxy setting."""
-        return Settings._settings["httpProxy"]
-
+        return str(Settings._settings["httpProxy"])
 
     @staticmethod
     def HttpsProxy() -> str:
         """Get the httpsProxy setting."""
-        return Settings._settings["httpsProxy"]
-
+        return str(Settings._settings["httpsProxy"])
 
     @staticmethod
     def ProxyUser() -> str:
         """Get the proxyUser setting."""
-        return Settings._settings["proxyUser"]
-
+        return str(Settings._settings["proxyUser"])
 
     @staticmethod
     def ProxyPassword() -> str:
         """Get the proxyPass setting."""
-        return Settings._settings["proxyPass"]
-
+        return str(Settings._settings["proxyPass"])
 
     @staticmethod
     def Certificate() -> str:
         """Get the certificate setting for SSL."""
-        return Settings._settings["certificate"]
+        return str(Settings._settings["certificate"])
 
     @staticmethod
     def CaCertificate() -> str:
         """Get the ca certificate setting for SSL."""
-        return Settings._settings["caCertificate"]
-
+        return str(Settings._settings["caCertificate"])
 
     @staticmethod
     def PrivateKey() -> str:
         """Get the private key setting for SSL."""
-        return Settings._settings["privateKey"]
-
+        return str(Settings._settings["privateKey"])
 
     @staticmethod
     def LimitRate() -> str:
         """Get the value of the --limit-rate setting used for Wget."""
-        return Settings._settings["limitRate"]
-
+        return str(Settings._settings["limitRate"])
 
     @staticmethod
     def Language() -> str:
         """Get the local languge setting."""
-        return Settings._settings["language"]
-
+        return str(Settings._settings["language"])
 
     @staticmethod
     def ForceUpdate() -> bool:
         """Get whether updates of files should be forced."""
-        return Settings._settings["forceUpdate"]
+        return bool(Settings._settings["forceUpdate"])
 
     @staticmethod
     def LogLevel() -> int:
         """Get the log level used for application logger."""
-        return logging._nameToLevel[Settings._settings["logLevel"]]
+        return int(logging._nameToLevel[str(Settings._settings["logLevel"])])
 
     @staticmethod
     def ByHash() -> bool:
         """Get whether the by-hash directories should be included in downloads."""
-        return Settings._settings["byHash"]
+        return bool(Settings._settings["byHash"])

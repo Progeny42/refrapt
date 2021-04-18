@@ -9,6 +9,7 @@ import re
 from functools import partial
 import tqdm
 from filelock import FileLock
+from dataclasses import dataclass
 
 from helpers import SanitiseUri
 from settings import Settings
@@ -134,13 +135,14 @@ class Source:
 
         return indexes
 
-
     def GetReleaseFiles(self) -> list:
         """Get a list of all Release files for the Source."""
         if self._sourceType == SourceType.Src:
             return self.__GetSourceIndexes()
         elif self._sourceType == SourceType.Bin:
             return self.__GetPackageIndexes()
+        else:
+            return []
 
     def __GetSourceIndexes(self) -> list:
         """Get a list of all Indexes for the Source if it represents a deb-src mirror."""
@@ -296,8 +298,11 @@ class Source:
         """Sets whether the resulting directory should be cleaned."""
         self._clean = value
 
+@dataclass
 class Downloader:
     """Downloads a list of files."""
+
+    @staticmethod
     def Download(urls: list, kind: UrlType):
         """Download a list of files of a specific type"""
         if not urls:
@@ -313,6 +318,7 @@ class Downloader:
             for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file"):
                 pass
 
+    @staticmethod
     def DownloadUrlsProcess(url: str, kind: str, args: list, logPath: str, rateLimit: str):
         """Worker method for downloading a particular Url, used in multiprocessing."""
         p = multiprocessing.current_process()
@@ -334,6 +340,7 @@ class Downloader:
 
             os.remove(filename)
 
+    @staticmethod
     def CustomArguments() -> list:
         """Creates custom Wget arguments based on the Settings provided."""
         arguments = []
@@ -385,8 +392,8 @@ class Index:
 
     def GetPackages(self) -> list:
         """Get a list of all Packages listed in the file."""
-        packages = []
-        package = dict()
+        packages = []    # type: list[dict[str,str]]
+        package = dict() # type: dict[str,str]
 
         keywords = ["Filename", "MD5sum", "SHA1", "SHA256", "Size", "Files", "Directory"]
 

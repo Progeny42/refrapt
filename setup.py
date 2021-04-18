@@ -13,7 +13,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Progeny42/Refrapt",
     author="Progeny42",
-    packages=find_packages(),
+    packages=["refrapt"],
     package_data={
         "refrapt": ["refrapt.conf"]
     },

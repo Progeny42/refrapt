@@ -11,199 +11,9 @@ import tqdm
 from filelock import FileLock
 
 from helpers import SanitiseUri
+from settings import Settings
 
 logger = logging.getLogger(__name__)
-
-class Settings:
-    def __init__(self):
-        """Initialises a new Settings class."""
-        self._settings = {
-            "architecture"      : "i386", 
-            "rootPath"          : "/var/spool/refrapt",
-            "mirrorPath"        : "/mirror",
-            "skelPath"          : "/skel",
-            "varPath"           : "/var",
-            "contents"          : True,
-            "threads"           : multiprocessing.cpu_count(),
-            "authNoChallenge"   : False,
-            "noCheckCertificate": False,
-            "unlink"            : False,
-            "useProxy"          : False,
-            "httpProxy"         : None,
-            "httpsProxy"        : None,
-            "proxyUser"         : None,
-            "proxyPass"         : None,
-            "certificate"       : None,
-            "caCertificate"     : None,
-            "privateKey"        : None,
-            "limitRate"         : "500m", # Wget syntax
-            "language"          : "en",   # TODO : Default to locale
-            "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
-            "logLevel"          : "INFO",
-            "test"              : False,
-            "byHash"            : False
-        }
-
-    def Parse(self, config: str):
-        """Parse the configuration file and set the settings defined."""
-        for line in config:
-            if line.startswith("set"):
-                key = line.split("set ")[1].split("=")[0].strip()
-                
-                if key in self._settings:
-                    value = line.split("=")[1].strip().split(" ")[0] # Allow for inline comments, but strip them here
-
-                    if value.isdigit():
-                        self._settings[key] = int(value)
-                    elif "true" in value.lower() or "false" in value.lower():
-                        self._settings[key] = value.lower() == "true"
-                    else:
-                        self._settings[key] = value
-
-                    logger.debug(f"Parsed setting: {key} = {self._settings.get(key)}")
-                else:
-                    logger.warn(f"Unknown setting in configuration file '{line}'")
-
-    @property
-    def Test(self) -> bool:
-        """Get whether Test mode is enabled."""
-        return self._settings["test"]
-
-    @Test.setter
-    def Test(self, value: bool):
-        """Set whether Test mode is enabled."""
-        self._settings["test"] = value
-
-    @property
-    def Architecture(self) -> str:
-        """Get the default Architecture."""
-        return self._settings["architecture"]
-
-    @property
-    def MirrorPath(self) -> str:
-        """Get the path to the /mirror directory."""
-        return self._settings["rootPath"] + "/" + self._settings["mirrorPath"]
-
-    @property
-    def SkelPath(self) -> str:
-        """Get the path to the /skel directory."""
-        return self._settings["rootPath"] + "/" + self._settings["skelPath"]
-
-    @property
-    def VarPath(self) -> str:
-        """Get the path to the /var directory."""
-        return self._settings["rootPath"] + "/" + self._settings["varPath"]
-
-    @property
-    def Contents(self) -> bool:
-        """Get whether Contents files should be included."""
-        return self._settings["contents"]
-
-    @property
-    def Threads(self) -> int:
-        """Get the number of threads to use for multiprocessing tasks."""
-        return self._settings["threads"]
-        
-    @property
-    def AuthNoChallege(self) -> bool:
-        """Get whether Wget should use the --auth-no-challenge parameter."""
-        return self._settings["authNoChallenge"]
-
-    @property
-    def NoCheckCertificate(self) -> bool:
-        """Get whether Wget should use the --no-check-certificate parameter."""
-        return self._settings["noCheckCertificate"]
-    
-    @property
-    def Unlink(self) -> bool:
-        """Get whether Wget should use the --unlink parameter."""
-        return self._settings["unlink"]
-
-    @property
-    def UseProxy(self) -> bool:
-        """Get whether Wget should use the -e use_proxy=yes parameter."""
-        return self._settings["useProxy"]
-
-    @property
-    def UseHttpProxy(self) -> bool:
-        """Get whether the httpProxy setting is defined."""
-        return len(self._settings["httpProxy"]) > 0
-
-    @property
-    def HttpProxy(self) -> str:
-        """Get the httpProxy setting."""
-        return self._settings["httpProxy"]
-
-    @property
-    def UseHttpsProxy(self) -> bool:
-        """Get whether the httpsProxy setting is defined."""
-        return len(self._settings["httpsProxy"]) > 0
-
-    @property
-    def HttpsProxy(self) -> str:
-        """Get the httpsProxy setting."""
-        return self._settings["httpsProxy"]
-
-    @property
-    def UseProxyUser(self) -> bool:
-        """Get whether the proxyUser setting is defined."""
-        return len(self._settings["proxyUser"]) > 0
-
-    @property
-    def ProxyUser(self) -> str:
-        """Get the proxyUser setting."""
-        return self._settings["proxyUser"]
-
-    @property
-    def UseProxyPassword(self) -> bool:
-        """Get whether the proxyPass setting is defined."""
-        return len(self._settings["proxyPass"]) > 0
-
-    @property
-    def ProxyPassword(self) -> str:
-        """Get the proxyPass setting."""
-        return self._settings["proxyPass"]
-
-    @property
-    def Certificate(self) -> str:
-        """Get the certificate setting for SSL."""
-        return self._settings["certificate"]
-
-    @property
-    def CaCertificate(self) -> str:
-        """Get the ca certificate setting for SSL."""
-        return self._settings["caCertificate"]
-
-    @property
-    def PrivateKey(self) -> str:
-        """Get the private key setting for SSL."""
-        return self._settings["privateKey"]
-
-    @property
-    def LimitRate(self) -> str:
-        """Get the value of the --limit-rate setting used for Wget."""
-        return self._settings["limitRate"]
-
-    @property
-    def Language(self) -> str:
-        """Get the local languge setting."""
-        return self._settings["language"]
-
-    @property
-    def ForceUpdate(self) -> bool:
-        """Get whether updates of files should be forced."""
-        return self._settings["forceUpdate"]
-
-    @property
-    def LogLevel(self) -> str:
-        """Get the log level used for application logger."""
-        return logging._nameToLevel[self._settings["logLevel"]]
-
-    @property
-    def ByHash(self) -> bool:
-        """Get whether the by-hash directories should be included in downloads."""
-        return self._settings["byHash"]
-
 
 class SourceType(Enum):
     """Distinguish between Binary and Source mirrors."""
@@ -270,7 +80,7 @@ class Source:
         logger.debug(f"\tDistribution: {self._distribution}")
         logger.debug(f"\tComponents:   {self._components}")
 
-    def GetIndexes(self, settings: Settings) -> list:
+    def GetIndexes(self) -> list:
         """Get a list of all Indexes for the Source."""
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
 
@@ -290,7 +100,7 @@ class Source:
         if self._sourceType == SourceType.Bin:
             # Binary Files
             if self._components:
-                if settings.Contents:
+                if Settings.Contents():
                     for architecture in self._architectures:
                         indexes.append(baseUrl + "Contents-" + architecture + ".gz")
                         indexes.append(baseUrl + "Contents-" + architecture + ".bz2")
@@ -298,7 +108,7 @@ class Source:
 
                 for component in self._components:
                     for architecture in self._architectures:
-                        if settings.Contents:
+                        if Settings.Contents():
                             indexes.append(baseUrl + component + "/Contents-" + architecture + ".gz")
                             indexes.append(baseUrl + component + "/Contents-" + architecture + ".bz2")
                             indexes.append(baseUrl + component + "/Contents-" + architecture + ".xz")
@@ -357,7 +167,7 @@ class Source:
 
         return indexes
 
-    def GetTranslationIndexes(self, settings: Settings) -> list:
+    def GetTranslationIndexes(self) -> list:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
             return []
@@ -367,27 +177,27 @@ class Source:
         translationIndexes = []
 
         for component in self._components:
-            translationIndexes += self.__ProcessTranslationIndex(baseUrl, component, settings)
+            translationIndexes += self.__ProcessTranslationIndex(baseUrl, component)
 
         return translationIndexes
 
-    def GetDep11Files(self, settings: Settings) -> list:
+    def GetDep11Files(self) -> list:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
             return []
         
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
         releaseUri = baseUrl + "Release"
-        releasePath = settings.SkelPath + "/" +  SanitiseUri(releaseUri)
+        releasePath = Settings.SkelPath() + "/" +  SanitiseUri(releaseUri)
 
         dep11Files = []
 
         for component in self._components:
-            dep11Files += self.__ProcessLine(releasePath, IndexType.Dep11, baseUrl, settings, "", component)
+            dep11Files += self.__ProcessLine(releasePath, IndexType.Dep11, baseUrl, "", component)
 
         return dep11Files
 
-    def __ProcessTranslationIndex(self, url: str, component: str, settings: Settings) -> list:
+    def __ProcessTranslationIndex(self, url: str, component: str) -> list:
         """Extract all Translation files from the /dists/$DIST/$COMPONENT/i18n/Index file.
         
            Falls back to parsing /dists/$DIST/Release if /i18n/Index is not found.
@@ -395,16 +205,16 @@ class Source:
 
         baseUri = url + component + "/i18n/"
         indexUri = baseUri + "Index"
-        indexPath = settings.SkelPath + "/" + SanitiseUri(indexUri)
+        indexPath = Settings.SkelPath() + "/" + SanitiseUri(indexUri)
 
         if not os.path.isfile(indexPath):
             releaseUri = url + "Release"
-            releasePath = settings.SkelPath + "/" + SanitiseUri(releaseUri)
-            return self.__ProcessLine(releasePath, IndexType.Release, url, settings, "", component)
+            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
+            return self.__ProcessLine(releasePath, IndexType.Release, url, "", component)
         else:
-            return self.__ProcessLine(indexPath, IndexType.Index, indexUri, settings, baseUri, "")
+            return self.__ProcessLine(indexPath, IndexType.Index, indexUri, baseUri, "")
 
-    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, settings: Settings, baseUri: str = "", component: str = "") -> list:
+    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
         """Parses an Index file for all filenames."""
         checksums = False
 
@@ -434,13 +244,13 @@ class Source:
                         if indexType == IndexType.Release:
                             if re.match(f"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
                                 indexes.append(indexUri + filename)
-                                if settings.ByHash:
+                                if Settings.ByHash():
                                     indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
                         elif indexType == IndexType.Dep11:
                             for arch in self._architectures:
                                 if re.match(f"^{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
                                     indexes.append(indexUri + filename)
-                            if settings.ByHash:
+                            if Settings.ByHash():
                                     indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
                         else:
                             indexes.append(baseUri + filename)                           
@@ -488,42 +298,35 @@ class Source:
 
 class Downloader:
     """Downloads a list of files."""
-    def Download(urls: list, kind: UrlType, settings: Settings):
+    def Download(urls: list, kind: UrlType):
         """Download a list of files of a specific type"""
         if not urls:
             logger.info("No files to download")
             return
 
-        arguments = Downloader.CustomArguments(settings)
+        arguments = Downloader.CustomArguments()
 
         logger.info(f"Downloading {len(urls)} {kind.name} files...")
 
-        with multiprocessing.Pool(settings.Threads) as pool:
-            downloadFunc = partial(Downloader.DownloadUrlsProcess, kind=kind.name, args=arguments, settings=settings)
+        with multiprocessing.Pool(Settings.Threads()) as pool:
+            downloadFunc = partial(Downloader.DownloadUrlsProcess, kind=kind.name, args=arguments, logPath=Settings.VarPath(), rateLimit=Settings.LimitRate())
             for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file"):
                 pass
 
-    def DownloadUrlsProcess(url: str, kind: UrlType, args: list, settings: Settings):
+    def DownloadUrlsProcess(url: str, kind: str, args: list, logPath: str, rateLimit: str):
         """Worker method for downloading a particular Url, used in multiprocessing."""
         p = multiprocessing.current_process()
 
         baseCommand   = "wget --no-cache -N"
         timestamp     = "-N" 
-        rateLimit     = f"--limit-rate={settings.LimitRate}"
+        rateLimit     = f"--limit-rate={rateLimit}"
         retries       = "-t 5"
         recursiveOpts = "-r -l inf"
-        logFile       = f"-a {settings.VarPath}/{kind}-log.{p._identity[0]}"
+        logFile       = f"-a {logPath}/{kind}-log.{p._identity[0]}"
 
-        # With Timestamps enabled (-N), if a file did not fully download, and you attempt to redownload again,
-        # Wget will check the timestamps, and possibly determine that nothing has changed. This would leave you with
-        # a partial file which won't get updated until the file on the server gets updated!
-        # By default, timestampping will save Wget re-downloading a file that it does not need to, but
-        # if the option is set by the user, timestamps should be ignored to allow Wget to redownload the
-        # file from scratch
+        filename = f"{logPath}/Download-lock.{p._identity[0]}"
 
-        #print(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
-
-        filename = f"{settings.VarPath}/Download-lock.{p._identity[0]}"
+        multiLogger.
 
         with FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:
@@ -533,35 +336,35 @@ class Downloader:
 
             os.remove(filename)
 
-    def CustomArguments(settings: Settings) -> list:
+    def CustomArguments() -> list:
         """Creates custom Wget arguments based on the Settings provided."""
         arguments = []
 
-        if settings.AuthNoChallege:
+        if Settings.AuthNoChallege():
             arguments.append("--auth-no-challenge")
-        if settings.NoCheckCertificate:
+        if Settings.NoCheckCertificate():
             arguments.append("--no-check-certificate")
-        if settings.Unlink:
+        if Settings.Unlink():
             arguments.append("--unlink")
 
-        if settings.Certificate:
-            arguments.append(f"--certificate={settings.Certificate}")
-        if settings.CaCertificate:
-            arguments.append(f"--ca-certificate={settings.CaCertificate}")
-        if settings.PrivateKey:
-            arguments.append(f"--privateKey={settings.PrivateKey}")
+        if Settings.Certificate():
+            arguments.append(f"--certificate={Settings.Certificate()}")
+        if Settings.CaCertificate():
+            arguments.append(f"--ca-certificate={Settings.CaCertificate()}")
+        if Settings.PrivateKey():
+            arguments.append(f"--privateKey={Settings.PrivateKey()}")
 
-        if settings.UseProxy:
+        if Settings.UseProxy():
             arguments.append("-e use_proxy=yes")
 
-            if settings.UseHttpProxy:
-                arguments.append("-e http_proxy=" + settings.HttpProxy)
-            if settings.UseHttpsProxy:
-                arguments.append("-e https_proxy=" + settings.HttpsProxy)
-            if settings.UseProxyUser:
-                arguments.append("-e proxy_user=" + settings.ProxyUser)
-            if settings.UseProxyPassword:
-                arguments.append("-e proxy_password=" + settings.ProxyPassword)
+            if Settings.HttpProxy():
+                arguments.append("-e http_proxy=" + Settings.HttpProxy())
+            if Settings.HttpsProxy():
+                arguments.append("-e https_proxy=" + Settings.HttpsProxy())
+            if Settings.ProxyUser():
+                arguments.append("-e proxy_user=" + Settings.ProxyUser())
+            if Settings.ProxyPassword():
+                arguments.append("-e proxy_password=" + Settings.ProxyPassword())
 
         return arguments
 

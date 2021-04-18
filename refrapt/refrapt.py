@@ -15,7 +15,6 @@ import datetime
 import pkg_resources
 
 from classes import (
-    Settings,
     Source,
     SourceType,
     UrlType,
@@ -24,8 +23,7 @@ from classes import (
 )
 
 from helpers import SanitiseUri
-
-settings = Settings()
+from settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +48,6 @@ def refrapt(conf: str, test: bool):
     startTime = time.perf_counter()
 
     clearSize = 0
-
     indexUrls = []
 
     ConfigureLogger()
@@ -60,14 +57,14 @@ def refrapt(conf: str, test: bool):
     configData = GetConfig(conf)
 
     # Parse the configuration file
-    settings.Parse(configData)
-    logging.getLogger().setLevel(settings.LogLevel)
+    Settings.Parse(configData)
+    logging.getLogger().setLevel(Settings.LogLevel())
 
     # Ensure that command line argument for Test overrides if it is set in the configuration file
     if test:
-        settings.Test = True
+        Settings.EnableTest()
 
-    if settings.Test:
+    if Settings.Test():
         logger.info("## Running in Test mode. Main download will not occur! ##\n")
 
     sources = GetSources(configData)
@@ -77,70 +74,70 @@ def refrapt(conf: str, test: bool):
         sys.exit()
 
     # Create working directories
-    Path(settings.MirrorPath).mkdir(parents=True, exist_ok=True)
-    Path(settings.SkelPath).mkdir(parents=True, exist_ok=True)
-    Path(settings.VarPath).mkdir(parents=True, exist_ok=True)
+    Path(Settings.MirrorPath()).mkdir(parents=True, exist_ok=True)
+    Path(Settings.SkelPath()).mkdir(parents=True, exist_ok=True)
+    Path(Settings.VarPath()).mkdir(parents=True, exist_ok=True)
 
     # Change to the Skel directory for working repository structure
-    os.chdir(settings.SkelPath)
+    os.chdir(Settings.SkelPath())
 
     # Check for any "-lock" files.
-    for file in os.listdir(settings.VarPath):
+    for file in os.listdir(Settings.VarPath()):
         if "Download-lock" in file:
             # A download was in progress and interrupted. This means a
             # partial download will be sitting on the drive. Remove
             # it to guarantee that it will be fully downloaded.
-            with open(f"{settings.VarPath}/{file}") as f:
+            with open(f"{Settings.VarPath()}/{file}") as f:
                 uri = f.readline()
                 uri = SanitiseUri(uri)
-                if os.path.isfile(f"{settings.MirrorPath}/{uri}")
-                    os.remove(f"{settings.MirrorPath}/{uri}")
-                elif os.path.isfile(f"{settings.VarPath}/{uri}")
-                    os.remove(f"{settings.VarPath}/{uri}")
+                if os.path.isfile(f"{Settings.MirrorPath()}/{uri}"):
+                    os.remove(f"{Settings.MirrorPath()}/{uri}")
+                elif os.path.isfile(f"{Settings.VarPath()}/{uri}"):
+                    os.remove(f"{Settings.VarPath()}/{uri}")
                 logger.info(f"Removed incomplete download {uri}")
 
     # Delete existing log files
     logger.info(f"Removing previous log files...")
-    for item in os.listdir(settings.VarPath):
-        os.remove(f"{settings.VarPath}/{item}")
+    for item in os.listdir(Settings.VarPath()):
+        os.remove(f"{Settings.VarPath()}/{item}")
 
     logger.info(f"Processing {len(sources)} sources...")
 
     # 1. Get the Index files for each of the sources
     indexFiles = []
     for source in sources:
-        indexFiles += source.GetIndexes(settings)
+        indexFiles += source.GetIndexes()
     
     for index in indexFiles:
         cleanList[SanitiseUri(index)] = True
     
     print()
     logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
-    Downloader.Download(indexFiles, UrlType.Index, settings)
+    Downloader.Download(indexFiles, UrlType.Index)
 
     # 2. Get the Translation files for each of the Sources
     translationFiles = []
     for source in sources:
-        translationFiles += source.GetTranslationIndexes(settings)
+        translationFiles += source.GetTranslationIndexes()
 
     for translationFile in translationFiles:
         cleanList[SanitiseUri(translationFile)] = True
 
     print()
     logger.info(f"Compiled a list of {len(translationFiles)} Translation files for download")
-    Downloader.Download(translationFiles, UrlType.Translation, settings)
+    Downloader.Download(translationFiles, UrlType.Translation)
 
     # 3. Get the Dep11 files for each of the Sources
     dep11Files = []
     for source in sources:
-        dep11Files += source.GetDep11Files(settings)
+        dep11Files += source.GetDep11Files()
 
     for dep11File in dep11Files:
         cleanList[SanitiseUri(dep11File)] = True
 
     print()
     logger.info(f"Compiled a list of {len(dep11Files)} Dep11 files for download")
-    Downloader.Download(dep11Files, UrlType.Dep11, settings)
+    Downloader.Download(dep11Files, UrlType.Dep11)
 
     # 4. Unzip each of the Packages / Sources indexes and obtain a list of all files to download
     DecompressReleaseFiles()
@@ -165,25 +162,25 @@ def refrapt(conf: str, test: bool):
     print()
     logger.info(f"Compiled a list of {len(filesToDownload)} Binary and Source files of size {downloadSize} for download")
 
-    os.chdir(settings.MirrorPath)
-    if not settings.Test:
-        Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive, settings)
+    os.chdir(Settings.MirrorPath())
+    if not Settings.Test():
+        Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive)
 
     # 6. Copy Skel to Main Archive
-    if not settings.Test:
+    if not Settings.Test():
         print()
         logger.info(f"Copying Skel to Mirror")
         for indexUrl in tqdm.tqdm(cleanList, unit=" files"):
-            if os.path.isfile(f"{settings.SkelPath}/{SanitiseUri(indexUrl)}"):
-                path = Path(f"{settings.MirrorPath}/{SanitiseUri(indexUrl)}")
+            if os.path.isfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"):
+                path = Path(f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
                 os.makedirs(path.parent.absolute(), exist_ok=True)
-                copyfile(f"{settings.SkelPath}/{SanitiseUri(indexUrl)}", f"{settings.MirrorPath}/{SanitiseUri(indexUrl)}")
+                copyfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}", f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
 
     # 7. Remove any unused files
     Clean()
 
     print()
-    logger.info(f"Refrapt completed in {datetime.timedelta(seconds=round(time.perf_counter() - startTime))}\n")
+    logger.info(f"Refrapt completed in {datetime.timedelta(seconds=round(time.perf_counter() - startTime))}")
 
 def ConfigureLogger():
     """Configure the logger for the Application."""
@@ -196,7 +193,7 @@ def ConfigureLogger():
     fileHandler.setFormatter(formatter)
 
     root = logging.getLogger()
-    root.setLevel(settings.LogLevel)
+    root.setLevel(Settings.LogLevel())
     root.addHandler(consoleHandler)
     root.addHandler(fileHandler)
 
@@ -256,7 +253,7 @@ def Clean():
     if clearSize == 0:
         return
 
-    if settings.Test:
+    if Settings.Test():
         logger.info(f"Found {ConvertSize(clearSize)} in {len(rmFiles)} files and {len(rmDirs)} directories that could be freed.")
         return
 
@@ -320,7 +317,7 @@ def DecompressReleaseFiles():
     print()
     logger.info(f"Decompressing {len(releaseFiles)} Release / Source files...")
 
-    with multiprocessing.Pool(settings.Threads) as pool:
+    with multiprocessing.Pool(Settings.Threads()) as pool:
         for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, releaseFiles), total=len(releaseFiles), unit=" file"):
             pass
 
@@ -347,18 +344,18 @@ def ProcessIndex(uri: str, index: int) -> tuple[list, int]:
 
     path = SanitiseUri(uri)
 
-    index = Index(f"{settings.SkelPath}/{path}/{index}")
+    index = Index(f"{Settings.SkelPath()}/{path}/{index}")
     index.Read()
 
     packages = index.GetPackages()
 
-    mirror = settings.MirrorPath + "/" + path
+    mirror = Settings.MirrorPath() + "/" + path
 
-    with open (settings.VarPath + "/ALL", "a+") as allFile, \
-         open (settings.VarPath + "/NEW", "a+") as newFile, \
-         open (settings.VarPath + "/MD5", "a+") as md5File, \
-         open (settings.VarPath + "/SHA1", "a+") as sha1File, \
-         open (settings.VarPath + "/SHA256", "a+") as sha256File:
+    with open (Settings.VarPath() + "/ALL", "a+") as allFile, \
+         open (Settings.VarPath() + "/NEW", "a+") as newFile, \
+         open (Settings.VarPath() + "/MD5", "a+") as md5File, \
+         open (Settings.VarPath() + "/SHA1", "a+") as sha1File, \
+         open (Settings.VarPath() + "/SHA256", "a+") as sha256File:
 
         for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages", leave=False, delay=0.5):
             if "Filename" in package:
@@ -421,7 +418,7 @@ def NeedUpdate(path: str, size: int) -> bool:
     # could remain the same, but source may have changed.
     # Allow the user to force an update via Settings
 
-    if settings.ForceUpdate:
+    if Settings.ForceUpdate():
         return True
 
     if os.path.isfile(path):
@@ -444,7 +441,7 @@ def GetSources(configData: str) -> list:
     """Determine the Sources listed in the Configuration file."""
     sources = []
     for line in  [x for x in configData if x.startswith("deb")]:
-        sources.append(Source(line, settings.Architecture))
+        sources.append(Source(line, Settings.Architecture()))
 
     for line in [x for x in configData if x.startswith("clean")]:
         if "False" in line:

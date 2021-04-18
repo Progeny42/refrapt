@@ -9,6 +9,7 @@ setup(
     name='Refrapt',
     version='0.1.0',
     description='A tool to mirror Debian repositories for use as a local mirror.',
+    python_requires='>=3.9',
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/Progeny42/Refrapt",
@@ -30,7 +31,7 @@ setup(
         'filelock >= 3.0.12'
     ],
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Operating System :: Microsoft :: Windows :: Windows 10",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python :: Implementation",

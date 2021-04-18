@@ -1,6 +1,51 @@
 # **Refrapt**
- 
-## **Why this project ***does not*** use Wget --continue or --no-if-modified-since for dealing with partial downloads**
+-------------
+
+## What is Refrapt?
+Refrapt (Refract Apt) is originally a clone of [`apt-mirror`](https://github.com/apt-mirror/apt-mirror), rewritten in Python, and adding a handful of improvements and fixes as identified by Open Issues and Pull Requests.
+
+I wanted a simple way of being able to clone Debian mirrors to create my own local repository. `apt-mirror` is what I had originally used, until it stopped working.
+
+Refrapt was developed on Windows, but intended for use on a Linux machine.
+
+## Features
+-------------
+If you've used `apt-mirror`, this should be familiar. However, there are a handful of new features available:
+* Progress Bars for each step of the application, and especially for downloads.
+* Downloads and decompression tasks are multithreaded, bu using `multiprocessing.Pools`, which leads to a more efficient use of threads when one thread is taking longer than others.
+* Support for multiple architectures per line. No more duplicating lines with just a change to the [arch=X] parameter!
+* SSL support for Wget. Simple populate the correct fields in the configuration file.
+* Logging is now also performed to a file as well as a Console. Log files are limited in size to 500MB, and retain the last 3.
+* Download of Contents-[arch].* is configurable via the configuration file.
+* Download of /by-hash/* directories is configurable via the configuration file.
+* Test mode to prevent doing the main download.
+* Automatic cleaning of directories after mirroring.
+* Safe partial download recovery in the event Refrapt is interrupted via file locking and detection at script start (see the section on partial downloads for an explanation).
+
+# Getting Started
+-------------
+To install Refrapt, run the following `pip` command:
+```sh
+pip install refrapt
+```
+
+The first time Refrapt is run, if a configuration file is not present, one will be created for you. To do this, issue the following command:
+```sh
+refrapt --conf "/path/to/your/config/file"
+```
+
+If you already have a configuration file, you can specify to use it using the same syntax above. By default Refrapt will look for the configuration file under `"/etc/apt/refrapt.conf"`.
+
+For help with commands, run `refrapt --help`.
+
+# Feature Explanation
+-------------
+
+## Test Mode
+Test mode can be set either via the configuration file, or passed as an argument to Refrapt using `--test`. Test mode still downlods the Index files that allow Refrapt to gather all the Packages and Sources that you have defined in the configuration file, but it will not attempt the main download. This is a useful feature if you wish to see how big a download will be before comitting to it.
+
+## Why this project ***does not*** use Wget --continue or --no-if-modified-since for dealing with partial downloads
+
 Partial downloads are a problem and there is not a simple way with `Wget` to resume a download without the possibility of either corrupting the file, or causing excess downloads to occur. 
 
 Refrapt uses the `--timestamping` (`-N`) option with `Wget`, which checks with the server the modified time of the file, and compares it with the local copy. If the timestamps match, regardless of whether the download completed, `Wget` will ignore the file with a 304 Not Modified. Under normal circumstances, this prevents redownloading files which you already have, saving on time and bandwidth. In the event a download was interrupted, a subsequent attempt will not succeed, as `Wget` will ignore the file.

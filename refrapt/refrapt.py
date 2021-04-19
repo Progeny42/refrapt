@@ -460,3 +460,6 @@ def GetSources(configData: list) -> list:
             logger.debug(f"Not cleaning {uri}")
 
     return sources
+
+if __name__ == "__main__":
+    refrapt()

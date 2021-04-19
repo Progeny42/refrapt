@@ -24,8 +24,8 @@ from refrapt.classes import (
     Index,
 )
 
-from helpers import SanitiseUri
-from settings import Settings
+from refrapt.helpers import SanitiseUri
+from refrapt.settings import Settings
 
 logger = logging.getLogger(__name__)
 

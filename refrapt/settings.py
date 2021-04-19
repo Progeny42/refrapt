@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 import multiprocessing
 import logging
 import os
@@ -7,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 class Settings:
     _settings = {
-        "architecture"      : "i386", 
+        "architecture"      : "i386",
         "rootPath"          : "/var/spool/refrapt",
         "mirrorPath"        : "/mirror",
         "skelPath"          : "/skel",
@@ -39,7 +38,7 @@ class Settings:
         for line in config:
             if line.startswith("set"):
                 key = line.split("set ")[1].split("=")[0].strip()
-                
+
                 if key in Settings._settings:
                     value = line.split("=")[1].strip().split(" ")[0] # Allow for inline comments, but strip them here
 
@@ -93,7 +92,7 @@ class Settings:
     def Threads() -> int:
         """Get the number of threads to use for multiprocessing tasks."""
         return int(str(Settings._settings["threads"]))
-        
+
     @staticmethod
     def AuthNoChallege() -> bool:
         """Get whether Wget should use the --auth-no-challenge parameter."""

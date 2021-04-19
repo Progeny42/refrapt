@@ -7,7 +7,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='Refrapt',
-    version='0.1.4',
+    version='0.1.5',
     description='A tool to mirror Debian repositories for use as a local mirror.',
     python_requires='>=3.9',
     long_description=README,
@@ -15,15 +15,6 @@ setup(
     url="https://github.com/Progeny42/Refrapt",
     author="Progeny42",
     packages=find_packages(),
-    # package_data={
-    #     "refrapt": ["refrapt.conf"]
-    # },
-    # py_modules=[
-    #     'refrapt', 
-    #     'classes', 
-    #     'helpers',
-    #     'settings'
-    # ],
     install_requires=[
         'Click >= 7.1.2',
         'Colorama >= 0.4.4',

@@ -7,7 +7,7 @@ import click
 import os
 import time
 from pathlib import Path
-import multiprocessing 
+import multiprocessing
 import math
 import shutil
 import tqdm
@@ -17,9 +17,8 @@ import gzip
 import lzma
 import bz2
 
-from classes import (
+from refrapt.classes import (
     Source,
-    SourceType,
     UrlType,
     Downloader,
     Index,
@@ -100,7 +99,7 @@ def refrapt(conf: str, test: bool):
                 logger.info(f"Removed incomplete download {uri}")
 
     # Delete existing log files
-    logger.info(f"Removing previous log files...")
+    logger.info("Removing previous log files...")
     for item in os.listdir(Settings.VarPath()):
         os.remove(f"{Settings.VarPath()}/{item}")
 
@@ -110,10 +109,10 @@ def refrapt(conf: str, test: bool):
     indexFiles = []
     for source in sources:
         indexFiles += source.GetIndexes()
-    
+
     for index in indexFiles:
         cleanList[SanitiseUri(index)] = True
-    
+
     print()
     logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
     Downloader.Download(indexFiles, UrlType.Index)
@@ -146,7 +145,7 @@ def refrapt(conf: str, test: bool):
     DecompressReleaseFiles()
 
     print()
-    logger.info(f"Building file list...")
+    logger.info("Building file list...")
     filesToDownload = list([tuple()]) # type: list[tuple[list,int]]
     filesToDownload.clear()
     for source in tqdm.tqdm(sources, position=0, unit=" source", desc="Sources "):
@@ -157,7 +156,7 @@ def refrapt(conf: str, test: bool):
             value = file[len(SanitiseUri(key)):]
             filesToDownload += ProcessIndex(key, value)
 
-    for download, size in filesToDownload:
+    for download, _ in filesToDownload:
         cleanList[SanitiseUri(download[0])] = True
 
     # 5. Perform the main download of Binary and Source files
@@ -172,7 +171,7 @@ def refrapt(conf: str, test: bool):
     # 6. Copy Skel to Main Archive
     if not Settings.Test():
         print()
-        logger.info(f"Copying Skel to Mirror")
+        logger.info("Copying Skel to Mirror")
         for indexUrl in tqdm.tqdm(cleanList, unit=" files"):
             if os.path.isfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"):
                 path = Path(f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
@@ -192,7 +191,7 @@ def ConfigureLogger():
     consoleHandler = logging.StreamHandler(sys.stdout)
     consoleHandler.setFormatter(formatter)
 
-    fileHandler = RotatingFileHandler(f"refrapt.log", maxBytes=524288000, backupCount=3)
+    fileHandler = RotatingFileHandler("refrapt.log", maxBytes=524288000, backupCount=3)
     fileHandler.setFormatter(formatter)
 
     root = logging.getLogger()
@@ -202,9 +201,9 @@ def ConfigureLogger():
 
 def GetConfig(conf: str) -> list:
     """Attempt to read the configuration file using the path provided.
-    
+
        If the configuration file is not found, a default configuration
-       will be written using the path provided, and the application 
+       will be written using the path provided, and the application
        will exit.
     """
     if not os.path.isfile(conf):
@@ -213,15 +212,15 @@ def GetConfig(conf: str) -> list:
         sys.exit()
     else:
         # Read the configuration file
-        with open (conf) as f:
+        with open(conf) as f:
             configData = list(filter(None, f.read().splitlines()))
-        
+
         logger.debug(f"Read {len(configData)} lines from config")
         return configData
 
 def CreateConfig(conf: str):
     """Create a new configuration file using the default provided.
-    
+
        If the destination directory for the file does not exist,
        the application will exit.
     """
@@ -234,12 +233,12 @@ def CreateConfig(conf: str):
     with open(conf, "w") as f:
         f.writelines(source)
 
-    logger.info(f"Configuration file created for first use. Add some sources and run again. Application exiting.")
+    logger.info("Configuration file created for first use. Add some sources and run again. Application exiting.")
 
 
 def Clean():
     """Clean any files or directories that are not used.
-    
+
        Determination of whether a file or directory is used
        is based on whether each of the files and directories
        within the path of a given Source were added to the
@@ -344,7 +343,7 @@ def UnzipFile(file: str):
 
 def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
     """Processes each package listed in the Index file.
-    
+
        For each Package that is found in the Index file,
        it is checked to see whether the file exists in the
        local mirror, and if not, adds it to the collection
@@ -361,11 +360,11 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
 
     mirror = Settings.MirrorPath() + "/" + path
 
-    with open (Settings.VarPath() + "/ALL", "a+") as allFile, \
-         open (Settings.VarPath() + "/NEW", "a+") as newFile, \
-         open (Settings.VarPath() + "/MD5", "a+") as md5File, \
-         open (Settings.VarPath() + "/SHA1", "a+") as sha1File, \
-         open (Settings.VarPath() + "/SHA256", "a+") as sha256File:
+    with open(Settings.VarPath() + "/ALL", "a+") as allFile, \
+         open(Settings.VarPath() + "/NEW", "a+") as newFile, \
+         open(Settings.VarPath() + "/MD5", "a+") as md5File, \
+         open(Settings.VarPath() + "/SHA1", "a+") as sha1File, \
+         open(Settings.VarPath() + "/SHA256", "a+") as sha256File:
 
         for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages", leave=False, delay=0.5):
             if "Filename" in package:
@@ -382,7 +381,7 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
                 if "SHA256" in package:
                     checksum = package["SHA256"]
                     sha256File.write(f"{checksum} {path}/{filename}\n")
-                
+
                 if NeedUpdate(f"{mirror}/{filename}", int(package["Size"])):
                     newFile.write(f"{uri}/{filename}\n")
                     packageDownloads.append((f"{uri}/{filename}", int(package["Size"])))
@@ -412,10 +411,10 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
 
 def NeedUpdate(path: str, size: int) -> bool:
     """Determine whether a file needs updating.
-    
-       If the file exists on disk, its size is compared 
-       to that listed in the Package. The result of the 
-       comparison determines whether the file should be 
+
+       If the file exists on disk, its size is compared
+       to that listed in the Package. The result of the
+       comparison determines whether the file should be
        downloaded.
 
        If the file does not exist, it must be downloaded.
@@ -450,7 +449,7 @@ def ConvertSize(bytes: int) -> str:
 def GetSources(configData: list) -> list:
     """Determine the Sources listed in the Configuration file."""
     sources = []
-    for line in  [x for x in configData if x.startswith("deb")]:
+    for line in [x for x in configData if x.startswith("deb")]:
         sources.append(Source(line, Settings.Architecture()))
 
     for line in [x for x in configData if x.startswith("clean")]:
@@ -461,6 +460,3 @@ def GetSources(configData: list) -> list:
             logger.debug(f"Not cleaning {uri}")
 
     return sources
-
-if __name__ == "__main__":
-    refrapt()

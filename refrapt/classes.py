@@ -3,8 +3,7 @@
 from enum import Enum
 import logging
 import os
-import multiprocessing 
-import sys
+import multiprocessing
 import re
 from functools import partial
 import tqdm
@@ -96,7 +95,7 @@ class Source:
             indexes.append(self._uri + "/" + self._distribution + "/Release.gpg")
             indexes.append(self._uri + "/" + self._distribution + "/Sources.gz")
             indexes.append(self._uri + "/" + self._distribution + "/Sources.bz2")
-            indexes.append(self._uri + "/" + self._distribution + "/Sources.xz") 
+            indexes.append(self._uri + "/" + self._distribution + "/Sources.xz")
 
         if self._sourceType == SourceType.Bin:
             # Binary Files
@@ -122,8 +121,6 @@ class Source:
                         indexes.append(baseUrl + component + "/i18n/cnf/Commands-" + architecture + ".xz")
 
                     indexes.append(baseUrl + component + "/i18n/Index")
-                    
-
         elif self._sourceType == SourceType.Src:
             # Source Files
             if self._components:
@@ -173,7 +170,7 @@ class Source:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
             return []
-        
+
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
 
         translationIndexes = []
@@ -187,10 +184,10 @@ class Source:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
         if self._sourceType != SourceType.Bin:
             return []
-        
+
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
         releaseUri = baseUrl + "Release"
-        releasePath = Settings.SkelPath() + "/" +  SanitiseUri(releaseUri)
+        releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
 
         dep11Files = []
 
@@ -201,7 +198,7 @@ class Source:
 
     def __ProcessTranslationIndex(self, url: str, component: str) -> list:
         """Extract all Translation files from the /dists/$DIST/$COMPONENT/i18n/Index file.
-        
+
            Falls back to parsing /dists/$DIST/Release if /i18n/Index is not found.
         """
 
@@ -222,7 +219,7 @@ class Source:
 
         indexes = []
 
-        with open (file) as f:
+        with open(file) as f:
             for line in f:
                 if "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line:
                     checksumType = line
@@ -244,22 +241,22 @@ class Source:
                         filename = parts[2].rstrip()
 
                         if indexType == IndexType.Release:
-                            if re.match(f"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
+                            if re.match(rf"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
                                 indexes.append(indexUri + filename)
                                 if Settings.ByHash():
                                     indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
                         elif indexType == IndexType.Dep11:
                             for arch in self._architectures:
-                                if re.match(f"^{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
+                                if re.match(rf"^{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
                                     indexes.append(indexUri + filename)
                             if Settings.ByHash():
-                                    indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
+                                indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
                         else:
-                            indexes.append(baseUri + filename)                           
+                            indexes.append(baseUri + filename)
                     else:
                         checksums = False
                 else:
-                    checksums = "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line   
+                    checksums = "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line
 
         return indexes
 
@@ -278,12 +275,12 @@ class Source:
         """Gets the Distribution of the Source."""
         return self._distribution
 
-    @property   
+    @property
     def Components(self) -> list:
         """Gets the Components of the Source."""
         return self._components
 
-    @property   
+    @property
     def Architectures(self) -> list:
         """Gets the Architectures of the Source."""
         return self._architectures
@@ -324,7 +321,6 @@ class Downloader:
         p = multiprocessing.current_process()
 
         baseCommand   = "wget --no-cache -N"
-        timestamp     = "-N" 
         rateLimit     = f"--limit-rate={rateLimit}"
         retries       = "-t 5"
         recursiveOpts = "-r -l inf"
@@ -384,7 +380,7 @@ class Index:
         contents = []
         self._lines = []
 
-        with open (self._path, "rb") as f:
+        with open(self._path, "rb") as f:
             contents = f.readlines()
 
         for line in contents:
@@ -402,9 +398,9 @@ class Index:
         for line in self._lines:
             if not line:
                 packages.append(package)
-                package = dict()  
+                package = dict()
             else:
-                match = re.search("^([\w\-]+:)", line)
+                match = re.search(r"^([\w\-]+:)", line)
                 if not match and key:
                     # Value continues on next line, append data
                     package[key] += f"\n{line.strip()}"

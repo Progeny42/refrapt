@@ -29,12 +29,12 @@ To install Refrapt, run the following `pip` command:
 pip3 install refrapt
 ```
 
-The first time Refrapt is run, if a configuration file is not present, one will be created for you at the path specified. To do this, issue the following command:
+The first time Refrapt is run, a default configuration file will be installed at ~/refrapt/refrapt.conf. To specify a custom location, issue the following command:
 ```sh
 refrapt --conf "/path/to/your/config/file/refrapt.conf"
 ```
 
-If you already have a configuration file, you can specify to use it using the same syntax above. By default Refrapt will look for the configuration file under `"/etc/apt/refrapt.conf"`.
+Edit the configuration file by adding each of the sources you wish to mirror. Examples are provided in the file.
 
 For help with commands, run `refrapt --help`.
 

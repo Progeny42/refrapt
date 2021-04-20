@@ -9,17 +9,11 @@
 # Each of the settings here are based on the default settings in Refrapt. If the values are
 # not specified in this file, the default in Refrapt will be used instead.
 
-# This is the default Architecture to be used if one is not specified in the source list
+# This is the default Architecture to be used if one is not specified in for a source.
 set architecture       = i386
-# The root path for Refrapt. Note that other paths are appended to this rootPath. ie mirrorPath = rootPath + mirrorPath 
-set rootPath           = /var/spool/refrapt
-# The location of the final mirrored contents.
-set mirrorPath         = /mirror
-# A working directory used by Refrapt to store Index files and other information about the repositories
-set skelPath           = /skel
-# A working directtory used by Refrapt to store log files and lock files. 
-# This directory will be wiped at the start of each run, so don't keep anything important here!
-set varPath            = /var
+# The root path for Refrapt. Note that other paths are appended to this rootPath.
+# If not specified, Refrapt will default to using your home directory.
+# set rootPath           = /refrapt
 # Specify whether the Contents-[arch].* files should be downloaded.
 set contents           = True
 # The number of threads to use for download and decompression. 

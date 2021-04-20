@@ -1,16 +1,15 @@
 import multiprocessing
 import logging
 import os
+from pathlib import Path
+import platform
 
 logger = logging.getLogger(__name__)
 
 class Settings:
     _settings = {
-        "architecture"      : "i386",
-        "rootPath"          : "/var/spool/refrapt",
-        "mirrorPath"        : "/mirror",
-        "skelPath"          : "/skel",
-        "varPath"           : "/var",
+        "architecture"      : platform.machine(),
+        "rootPath"          : f"{str(Path.home())}/refrapt",
         "contents"          : True,
         "threads"           : multiprocessing.cpu_count(),
         "authNoChallenge"   : False,
@@ -60,7 +59,7 @@ class Settings:
 
     @staticmethod
     def EnableTest():
-        """Set whether Test mode is enabled."""
+        """Enable Test mode."""
         Settings._settings["test"] = True
 
     @staticmethod
@@ -69,19 +68,24 @@ class Settings:
         return str(Settings._settings["architecture"])
 
     @staticmethod
+    def GetRootPath() -> str:
+        """Get the root path."""
+        return str(Settings._settings["rootPath"])
+
+    @staticmethod
     def MirrorPath() -> str:
         """Get the path to the /mirror directory."""
-        return str(Settings._settings["rootPath"]) + os.sep + str(Settings._settings["mirrorPath"])
+        return str(Settings._settings["rootPath"]) + os.sep + "mirror"
 
     @staticmethod
     def SkelPath() -> str:
         """Get the path to the /skel directory."""
-        return str(Settings._settings["rootPath"]) + os.sep + str(Settings._settings["skelPath"])
+        return str(Settings._settings["rootPath"]) + os.sep + "skel"
 
     @staticmethod
     def VarPath() -> str:
         """Get the path to the /var directory."""
-        return str(Settings._settings["rootPath"]) + os.sep + str(Settings._settings["varPath"])
+        return str(Settings._settings["rootPath"]) + os.sep + "var"
 
     @staticmethod
     def Contents() -> bool:

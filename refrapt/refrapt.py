@@ -16,6 +16,7 @@ import pkg_resources
 import gzip
 import lzma
 import bz2
+import site
 
 from refrapt.classes import (
     Source,
@@ -37,9 +38,9 @@ clearSize = 0
 
 @click.command()
 @click.version_option(pkg_resources.require("refrapt")[0].version)
-@click.option("--conf", default="/etc/apt/refrapt.conf", help="Path to configuration file.", type=click.STRING)
+@click.option("--conf", default=f"{Settings.GetRootPath()}/refrapt.conf", help="Path to configuration file.", type=click.STRING)
 @click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files.", type=click.BOOL)
-def refrapt(conf: str, test: bool):
+def main(conf: str, test: bool):
     """A tool to mirror Debian repositories for use as a local mirror."""
 
     global sources
@@ -80,6 +81,8 @@ def refrapt(conf: str, test: bool):
     Path(Settings.SkelPath()).mkdir(parents=True, exist_ok=True)
     Path(Settings.VarPath()).mkdir(parents=True, exist_ok=True)
 
+    Downloader.Init()
+
     # Change to the Skel directory for working repository structure
     os.chdir(Settings.SkelPath())
 
@@ -89,17 +92,19 @@ def refrapt(conf: str, test: bool):
             # A download was in progress and interrupted. This means a
             # partial download will be sitting on the drive. Remove
             # it to guarantee that it will be fully downloaded.
+            uri = None
             with open(f"{Settings.VarPath()}/{file}") as f:
                 uri = f.readline()
-                uri = SanitiseUri(uri)
-                if os.path.isfile(f"{Settings.MirrorPath()}/{uri}"):
-                    os.remove(f"{Settings.MirrorPath()}/{uri}")
-                elif os.path.isfile(f"{Settings.VarPath()}/{uri}"):
-                    os.remove(f"{Settings.VarPath()}/{uri}")
-                logger.info(f"Removed incomplete download {uri}")
 
-    # Delete existing log files
-    logger.info("Removing previous log files...")
+            uri = SanitiseUri(uri)
+            if os.path.isfile(f"{Settings.MirrorPath()}/{uri}"):
+                os.remove(f"{Settings.MirrorPath()}/{uri}")
+            elif os.path.isfile(f"{Settings.VarPath()}/{uri}"):
+                os.remove(f"{Settings.VarPath()}/{uri}")
+            logger.info(f"Removed incomplete download {uri}")
+
+    # Delete existing /var files
+    logger.info("Removing previous /var files...")
     for item in os.listdir(Settings.VarPath()):
         os.remove(f"{Settings.VarPath()}/{item}")
 
@@ -179,6 +184,7 @@ def refrapt(conf: str, test: bool):
                 shutil.copyfile(f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}", f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}")
 
     # 7. Remove any unused files
+    print()
     Clean()
 
     print()
@@ -191,7 +197,9 @@ def ConfigureLogger():
     consoleHandler = logging.StreamHandler(sys.stdout)
     consoleHandler.setFormatter(formatter)
 
-    fileHandler = RotatingFileHandler("refrapt.log", maxBytes=524288000, backupCount=3)
+    path = Path(Settings.GetRootPath())
+    os.makedirs(path, exist_ok=True)
+    fileHandler = RotatingFileHandler(f"{Settings.GetRootPath()}/refrapt.log", maxBytes=524288000, backupCount=3)
     fileHandler.setFormatter(formatter)
 
     root = logging.getLogger()
@@ -224,17 +232,18 @@ def CreateConfig(conf: str):
        If the destination directory for the file does not exist,
        the application will exit.
     """
+
     path = Path(conf)
     if not os.path.isdir(path.parent.absolute()):
         logger.error("Path for configuration file not valid. Application exiting.")
         sys.exit()
 
-    source = pkg_resources.resource_string(__name__, "refrapt.conf").decode().split("\n")
-    with open(conf, "w") as f:
-        f.writelines(source)
+    defaultConfigPath = f"{site.USER_BASE}/refrapt/refrapt.conf.example"
+    with open(defaultConfigPath, "r") as fIn:
+        with open(conf, "w") as f:
+            f.writelines(fIn.readlines())
 
-    logger.info("Configuration file created for first use. Add some sources and run again. Application exiting.")
-
+    logger.info(f"Configuration file created for first use at '{conf}'. Add some sources and run again. Application exiting.")
 
 def Clean():
     """Clean any files or directories that are not used.
@@ -246,8 +255,8 @@ def Clean():
        based on the current configuration file, the items
        are not required.
     """
-
-    for source in [x for x in sources if x.Clean]:
+    logger.info("Compiling list of files to clean...")
+    for source in tqdm.tqdm([x for x in sources if x.Clean], unit=" sources"):
         directory = SanitiseUri(source.Uri)
         if os.path.isdir(directory) and not os.path.islink(directory):
             ProcessDirectory(directory)
@@ -460,6 +469,3 @@ def GetSources(configData: list) -> list:
             logger.debug(f"Not cleaning {uri}")
 
     return sources
-
-if __name__ == "__main__":
-    refrapt()

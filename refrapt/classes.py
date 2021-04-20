@@ -7,7 +7,7 @@ import multiprocessing
 import re
 from functools import partial
 import tqdm
-from filelock import FileLock
+import filelock
 from dataclasses import dataclass
 
 from refrapt.helpers import SanitiseUri
@@ -298,6 +298,22 @@ class Source:
 @dataclass
 class Downloader:
     """Downloads a list of files."""
+    @staticmethod
+    def Init():
+        """Setup filelock for quieter logging and handling of lock files (unix)."""
+
+        # Quieten filelock's logger
+        filelock.logger().setLevel(logging.CRITICAL)
+
+        # filelock does not delete releasd lock files on Unix due
+        # to potential race conditions in the event of multiple
+        # programs trying to lock the file.
+        # Refrapt only uses them to track whether a file was fully
+        # downloaded or not in the event of interruption, so we
+        # can cleanup the files now.
+        for file in os.listdir(Settings.VarPath()):
+            if ".lock" in file:
+                os.remove(f"{Settings.VarPath()}/{file}")
 
     @staticmethod
     def Download(urls: list, kind: UrlType):
@@ -328,7 +344,7 @@ class Downloader:
 
         filename = f"{logPath}/Download-lock.{p._identity[0]}"
 
-        with FileLock(f"{filename}.lock"):
+        with filelock.FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:
                 f.write(url)
 

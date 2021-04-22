@@ -1,6 +1,5 @@
 import multiprocessing
 import logging
-import os
 from pathlib import Path
 import platform
 
@@ -10,6 +9,9 @@ class Settings:
     _settings = {
         "architecture"      : platform.machine(),
         "rootPath"          : f"{str(Path.home())}/refrapt",
+        "mirrorPath"        : f"{str(Path.home())}/refrapt/mirror",
+        "skelPath"          : f"{str(Path.home())}/refrapt/skel",
+        "varPath"           : f"{str(Path.home())}/refrapt/var",
         "contents"          : True,
         "threads"           : multiprocessing.cpu_count(),
         "authNoChallenge"   : False,
@@ -75,17 +77,17 @@ class Settings:
     @staticmethod
     def MirrorPath() -> str:
         """Get the path to the /mirror directory."""
-        return str(Settings._settings["rootPath"]) + os.sep + "mirror"
+        return str(Settings._settings["mirrorPath"])
 
     @staticmethod
     def SkelPath() -> str:
         """Get the path to the /skel directory."""
-        return str(Settings._settings["rootPath"]) + os.sep + "skel"
+        return str(Settings._settings["skelPath"])
 
     @staticmethod
     def VarPath() -> str:
         """Get the path to the /var directory."""
-        return str(Settings._settings["rootPath"]) + os.sep + "var"
+        return str(Settings._settings["varPath"])
 
     @staticmethod
     def Contents() -> bool:

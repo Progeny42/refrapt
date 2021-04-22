@@ -11,9 +11,17 @@
 
 # This is the default Architecture to be used if one is not specified in for a source.
 set architecture       = i386
-# The root path for Refrapt. Note that other paths are appended to this rootPath.
-# If not specified, Refrapt will default to using your home directory.
-# set rootPath           = /refrapt
+
+# For each of the path variables, if not specified, will be found in ~/refrapt
+# The root path for log files and the configuration file.
+# set rootPath   = ""
+# The directory where the mirror will be stored. This will be the larget directory, so use a large drive!
+# set mirrorPath = ""
+# Directory used for intermediate Index files. Recommend using an SSD for best performance during the building of file lists.
+# set skelPath   = ""
+# Directory used for storing log files and lock files. Recommend using an SSD for best performance.
+# set varPath    = ""
+
 # Specify whether the Contents-[arch].* files should be downloaded.
 set contents           = True
 # The number of threads to use for download and decompression. 

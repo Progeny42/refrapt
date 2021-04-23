@@ -256,8 +256,10 @@ def Clean():
        are not required.
     """
     logger.info("Compiling list of files to clean...")
-    for source in tqdm.tqdm([x for x in sources if x.Clean], unit=" sources"):
-        directory = SanitiseUri(source.Uri)
+    cleanSources = [x for x in sources if x.Clean]
+    uris = {source.Uri for source in cleanSources}
+    for uri in tqdm.tqdm(uris, unit=" mirrors"):
+        directory = SanitiseUri(uri)
         if os.path.isdir(directory) and not os.path.islink(directory):
             ProcessDirectory(directory)
 

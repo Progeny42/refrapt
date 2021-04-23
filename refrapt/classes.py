@@ -430,3 +430,17 @@ class Index:
                         key = None
 
         return packages
+
+class LogFilter(object):
+    """Class to provide filtering for logging.
+
+       The Level passed to this class will define the minimum
+       log level that is allowed by logger.
+    """
+    def __init__(self, level):
+        """Initialise the filter level."""
+        self.__level = level
+
+    def filter(self, logRecord):
+        """Return whether the Record is covered by a filter or not."""
+        return logRecord.levelno >= self.__level

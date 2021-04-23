@@ -23,6 +23,7 @@ from refrapt.classes import (
     UrlType,
     Downloader,
     Index,
+    LogFilter
 )
 
 from refrapt.helpers import SanitiseUri
@@ -31,7 +32,7 @@ from refrapt.settings import Settings
 logger = logging.getLogger(__name__)
 
 sources = [] # type: list[Source]
-cleanList = dict()
+cleanList = dict() # type : dict[str, bool]
 rmDirs = [] # type: list[str]
 rmFiles = [] # type: list[str]
 clearSize = 0
@@ -115,7 +116,9 @@ def main(conf: str, test: bool):
     for source in sources:
         indexFiles += source.GetIndexes()
 
+    logger.debug("Adding Index Files to cleanList:")
     for index in indexFiles:
+        logger.debug(SanitiseUri(index))
         cleanList[SanitiseUri(index)] = True
 
     print()
@@ -127,7 +130,9 @@ def main(conf: str, test: bool):
     for source in sources:
         translationFiles += source.GetTranslationIndexes()
 
+    logger.debug("Adding Translation Files to cleanList:")
     for translationFile in translationFiles:
+        logger.debug(SanitiseUri(translationFile))
         cleanList[SanitiseUri(translationFile)] = True
 
     print()
@@ -139,7 +144,9 @@ def main(conf: str, test: bool):
     for source in sources:
         dep11Files += source.GetDep11Files()
 
+    logger.debug("Adding dep11 Files to cleanList:")
     for dep11File in dep11Files:
+        logger.debug(SanitiseUri(dep11File))
         cleanList[SanitiseUri(dep11File)] = True
 
     print()
@@ -161,7 +168,9 @@ def main(conf: str, test: bool):
             value = file[len(SanitiseUri(key)):]
             filesToDownload += ProcessIndex(key, value)
 
+    logger.debug("Adding downloadable Files to cleanList:")
     for download, _ in filesToDownload:
+        logger.debug(SanitiseUri(download[0]))
         cleanList[SanitiseUri(download[0])] = True
 
     # 5. Perform the main download of Binary and Source files
@@ -194,8 +203,11 @@ def ConfigureLogger():
     """Configure the logger for the Application."""
     formatter = logging.Formatter("[%(asctime)s] %(levelname)s: %(message)s", "%Y-%m-%d %H:%M:%S")
 
+    # Console minimum level is INFO regardless of settings, to
+    # prevent overloading the screen
     consoleHandler = logging.StreamHandler(sys.stdout)
     consoleHandler.setFormatter(formatter)
+    consoleHandler.addFilter(LogFilter(logging.INFO))
 
     path = Path(Settings.GetRootPath())
     os.makedirs(path, exist_ok=True)
@@ -264,6 +276,7 @@ def Clean():
             ProcessDirectory(directory)
 
     if clearSize == 0:
+        logger.info("No files available to clean")
         return
 
     if Settings.Test():

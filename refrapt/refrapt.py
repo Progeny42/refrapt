@@ -135,7 +135,7 @@ def main(conf: str, test: bool):
 
         logger.debug("Adding Index Files to filesToKeep:")
         for index in indexFiles:
-            logger.debug(SanitiseUri(index))
+            logger.debug(f"\t{SanitiseUri(index)}")
             filesToKeep.append(SanitiseUri(index))
 
         print()
@@ -152,7 +152,7 @@ def main(conf: str, test: bool):
 
         logger.debug("Adding Translation Files to filesToKeep:")
         for translationFile in translationFiles:
-            logger.debug(SanitiseUri(translationFile))
+            logger.debug(f"\t{SanitiseUri(translationFile)}")
             filesToKeep.append(SanitiseUri(translationFile))
 
         print()
@@ -166,7 +166,7 @@ def main(conf: str, test: bool):
 
         logger.debug("Adding dep11 Files to filesToKeep:")
         for dep11File in dep11Files:
-            logger.debug(SanitiseUri(dep11File))
+            logger.debug(f"\t{SanitiseUri(dep11File)}")
             filesToKeep.append(SanitiseUri(dep11File))
 
         print()
@@ -188,8 +188,8 @@ def main(conf: str, test: bool):
 
         logger.debug("Adding downloadable Files to filesToKeep:")
         for download, _ in filesToDownload:
-            logger.debug(SanitiseUri(download[0]))
-            filesToKeep.append(SanitiseUri(download[0]))
+            logger.debug(f"\t{SanitiseUri(download)}")
+            filesToKeep.append(SanitiseUri(download))
 
         # 5. Perform the main download of Binary and Source files
         downloadSize = CalculateDownloadSize([x[1] for x in filesToDownload])

@@ -110,11 +110,11 @@ class Source:
             indexes.append(self._uri + "/" + self._distribution + "/InRelease")
             indexes.append(self._uri + "/" + self._distribution + "/Release")
             indexes.append(self._uri + "/" + self._distribution + "/Release.gpg")
-            self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Sources")
-            self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Packages")
             for compressionFormat in compressionFormats:
                 indexes.append(self._uri + "/" + self._distribution + "/Sources" + compressionFormat)
                 indexes.append(self._uri + "/" + self._distribution + "/Packages" + compressionFormat)
+                self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Sources" + compressionFormat)
+                self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Packages" + compressionFormat)
 
         if self._sourceType == SourceType.Bin:
             # Binary Files
@@ -132,9 +132,9 @@ class Source:
 
                         indexes.append(f"{baseUrl}{component}/binary-{architecture}/Release")
 
-                        self._indexCollection.Add(component, architecture, baseUrl + component + "/binary-" + architecture + "/Packages")
                         for compressionFormat in compressionFormats:
                             indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
+                            self._indexCollection.Add(component, architecture, baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
                             indexes.append(baseUrl + component + "/cnf/Commands-" + architecture + compressionFormat)
                             indexes.append(baseUrl + component + "/i18n/cnf/Commands-" + architecture + compressionFormat)
 
@@ -144,9 +144,9 @@ class Source:
             if self._components:
                 for component in self._components:
                     indexes.append(baseUrl + component + "/source/Release")
-                    self._indexCollection.Add(component, self._architectures[0], baseUrl + component + "/source/Sources")
                     for compressionFormat in compressionFormats:
                         indexes.append(baseUrl + component + "/source/Sources" + compressionFormat)
+                        self._indexCollection.Add(component, self._architectures[0], baseUrl + component + "/source/Sources" + compressionFormat)
 
         self._indexCollection.DetermineCurrentTimestamps()
 
@@ -331,16 +331,18 @@ class IndexCollection:
         self._indexCollection[component][architecture][SanitiseUri(file)] = Timestamp()
 
     def DetermineCurrentTimestamps(self):
+        logger.debug("Getting timestamps of current files in Skel (if available)")
         # Now we have built our index collection, gather timestamps for all the files (that exist)
         for component in self._indexCollection:
             for architecture in self._indexCollection[component]:
                 for file in self._indexCollection[component][architecture]:
                     if os.path.isfile(f"{Settings.SkelPath()}/{file}"):
                         self._indexCollection[component][architecture][file].Current = os.path.getmtime(Path(f"{Settings.SkelPath()}/{SanitiseUri(file)}"))
+                        logger.debug(f"\tCurrent: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Current}")
 
     def DetermineDownloadTimestamps(self):
+        logger.debug("Getting timestamps of downloaded files in Skel")
         removables = collections.defaultdict(dict) # type: dict[str, dict[str, list[str]]]
-
         for component in self._indexCollection:
             for architecture in self._indexCollection[component]:
                 removables[component][architecture] = list()
@@ -350,9 +352,11 @@ class IndexCollection:
                 for file in self._indexCollection[component][architecture]:
                     if os.path.isfile(f"{Settings.SkelPath()}/{file}"):
                         self._indexCollection[component][architecture][file].Download = os.path.getmtime(Path(f"{Settings.SkelPath()}/{SanitiseUri(file)}"))
+                        logger.debug(f"\tDownload: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Download}")
                     else:
                         # File does not exist after download, therefore it does not exist, and can marked for removal.
                         removables[component][architecture].append(file)
+                        logger.debug(f"\tMarked for removal (does not exist): [{component}] [{architecture}] [{file}]: ")
 
         for component in removables:
             for architecture in removables[component]:
@@ -370,7 +374,7 @@ class IndexCollection:
                         filename, _ = os.path.splitext(file)
                         files.append(filename)
 
-        return files
+        return list(set(files)) # Ensure uniqueness
 
 @dataclass
 class Downloader:

@@ -119,7 +119,7 @@ def main(conf: str, test: bool):
     for item in os.listdir(Settings.VarPath()):
         os.remove(f"{Settings.VarPath()}/{item}")
 
-    filesToDownload = list([tuple()]) # type: list[tuple[list, int]]
+    filesToDownload = list([tuple()]) # type: list[tuple[str, int]]
     filesToDownload.clear()
 
     # Create a lock file for the Application
@@ -413,7 +413,7 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
        local mirror, and if not, adds it to the collection
        for download.
     """
-    packageDownloads = []
+    packageDownloads = [] # type: list[tuple[str, int]]
 
     path = SanitiseUri(uri)
 

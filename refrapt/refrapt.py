@@ -34,9 +34,6 @@ logger = logging.getLogger(__name__)
 
 sources = [] # type: list[Source]
 filesToKeep = list() # type : dict[str]
-rmDirs = [] # type: list[str]
-rmFiles = [] # type: list[str]
-clearSize = 0
 
 @click.command()
 @click.version_option(pkg_resources.require("refrapt")[0].version)
@@ -47,13 +44,8 @@ def main(conf: str, test: bool):
 
     global sources
     global filesToKeep
-    global rmDirs
-    global rmFiles
-    global clearSize
 
     startTime = time.perf_counter()
-
-    clearSize = 0
 
     ConfigureLogger()
 
@@ -178,18 +170,22 @@ def main(conf: str, test: bool):
 
         print()
         logger.info("Building file list...")
-        for source in tqdm.tqdm(sources, position=0, unit=" source", desc="Sources "):
-            releaseFiles = source.GetReleaseFiles()
+        for source in tqdm.tqdm([x for x in sources if x.Modified], position=0, unit=" source", desc="Sources "):
+            releaseFiles = source.GetReleaseFiles(True) # Only get modified files
 
             key = source.Uri
             for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indexes ", leave=False):
                 value = file[len(SanitiseUri(key)):]
                 filesToDownload += ProcessIndex(key, value)
 
-        logger.debug("Adding downloadable Files to filesToKeep:")
-        for download, _ in filesToDownload:
-            logger.debug(f"\t{SanitiseUri(download)}")
-            filesToKeep.append(SanitiseUri(download))
+        # Packages potentially add duplicate downloads, slowing down the rest
+        # of the process. To counteract, remove duplicates now
+        filesToDownload = list(set(filesToDownload))
+        filesToKeep = list(set(filesToKeep))
+
+        logger.debug(f"Files to keep: {len(filesToKeep)}")
+        for file in filesToKeep:
+            logger.debug(f"\t{file}")
 
         # 5. Perform the main download of Binary and Source files
         downloadSize = CalculateDownloadSize([x[1] for x in filesToDownload])
@@ -206,14 +202,14 @@ def main(conf: str, test: bool):
             logger.info("Copying Skel to Mirror")
             for indexUrl in tqdm.tqdm(filesToKeep, unit=" files"):
                 skelFile   = f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"
-                mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
                 if os.path.isfile(skelFile):
+                    mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
                     copy = True
                     if os.path.isfile(mirrorFile):
                         # Compare files using Timestamp to save moving files that don't need to be
                         skelTimestamp   = os.path.getmtime(Path(skelFile))
                         mirrorTimestamp = os.path.getmtime(Path(mirrorFile))
-                        copy = skelTimestamp >= mirrorTimestamp
+                        copy = skelTimestamp > mirrorTimestamp
 
                     if copy:
                         os.makedirs(Path(mirrorFile).parent.absolute(), exist_ok=True)
@@ -301,13 +297,66 @@ def Clean():
        are not required.
     """
 
-    logger.info("Compiling list of files to clean...")
+    # All sources marked as Clean and having been Modified
     cleanSources = [x for x in sources if x.Clean and x.Modified]
+
+    if not cleanSources:
+        logger.info("Nothing to clean")
+        return
+
+    logger.info("Beginning Clean process...")
+    logger.debug("Clean Sources (Modified)")
+    for src in cleanSources:
+        logger.debug(f"{src.Uri} [{src.Distribution}] {src.Components}")
+    # Remaining sources with the same URI
+    allUriSources = []
+    for cleanSource in cleanSources:
+        allUriSources += [x for x in sources if x.Uri in cleanSource.Uri]
+    # Remove duplicates
+    allUriSources = list(set(allUriSources))
+
+    logger.debug("All sources with same URI")
+    for src in allUriSources:
+        logger.debug(f"{src.Uri} [{src.Distribution}] {src.Components}")
+
+    # In order to not end up removing files that are listed in Indexes
+    # that were not processed in previous steps, we do need to read the
+    # remainder of the Packages and Sources files in for the URI in order
+    # to build a full list of maintained files.
+    for source in tqdm.tqdm(allUriSources, position=0, unit=" source", desc="Sources "):
+        releaseFiles = source.GetReleaseFiles(False) # Gets unmodified release files
+
+        key = source.Uri
+        for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indexes ", leave=False):
+            value = file[len(SanitiseUri(key)):]
+            ProcessUnmodifiedIndex(key, value)
+
+    # Packages potentially add duplicate downloads, slowing down the rest
+    # of the process. To counteract, remove duplicates now
+    requiredFiles = [] # type: list[str]
+    requiredFiles = list(set(filesToKeep))
+
+    print()
+    items = [] # type: list[str]
+    logger.info("Compiling list of files to clean...")
     uris = {source.Uri for source in cleanSources}
-    for uri in tqdm.tqdm(uris, unit=" mirrors"):
-        directory = SanitiseUri(uri)
-        if os.path.isdir(directory) and not os.path.islink(directory):
-            ProcessDirectory(directory)
+    for uri in tqdm.tqdm(uris, position=0, unit=" mirror", desc="Mirrors"):
+        walked = [] # type: list[str]
+        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO    ", leave=False, delay=0.5):
+            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files  ", leave=False, delay=0.5):
+                walked.append(os.path.join(root, file))
+
+        logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
+        items += [x for x in walked if x not in requiredFiles and not os.path.islink(x)]
+
+    logger.debug(f"Found {len(items)} which can be freed")
+    for item in items:
+        logger.debug(item)
+
+    # Calculate size of items to clean
+    clearSize = 0
+    for file in items:
+        clearSize += os.path.getsize(file)
 
     if clearSize == 0:
         logger.info("No files eligible to clean")
@@ -315,51 +364,14 @@ def Clean():
 
     if Settings.Test():
         print()
-        logger.info(f"Found {ConvertSize(clearSize)} in {len(rmFiles)} files and {len(rmDirs)} directories that could be freed.")
+        logger.info(f"Found {ConvertSize(clearSize)} in {len(items)} files and directories that could be freed.")
         return
 
     print()
-    logger.info(f"{ConvertSize(clearSize)} in {len(rmFiles)} files and {len(rmDirs)} directories will be freed...")
+    logger.info(f"{ConvertSize(clearSize)} in {len(items)} files and directories will be freed...")
 
-    for file in tqdm.tqdm(rmFiles, unit=" files", desc="Files"):
-        os.remove(file)
-
-    for dir in tqdm.tqdm(rmDirs, unit=" dirs", desc="Dirs "):
-        os.rmdir(dir)
-
-def ProcessDirectory(directory: str) -> bool:
-    """Recursively check whether a directory and all of its contents and eligible for removal."""
-    required = False
-
-    if directory in filesToKeep:
-        return True
-
-    for item in os.listdir(directory):
-        child = directory + "/" + item
-
-        if os.path.isdir(child) and not os.path.islink(child):
-            required |= ProcessDirectory(child)
-        elif os.path.isfile(child):
-            required |= ProcessFile(child)
-        elif os.path.islink(child):
-            required = True # Symlinks are always needed
-
-    if not required:
-        rmDirs.append(directory)
-
-    return required
-
-def ProcessFile(file: str) -> bool:
-    """Check whether a file is eligible for removal."""
-    global clearSize
-
-    if file in filesToKeep:
-        return True
-
-    rmFiles.append(file)
-    clearSize += os.path.getsize(file)
-
-    return False
+    for item in items:
+        os.remove(item)
 
 def CalculateDownloadSize(files: list) -> str:
     """Calculates the total size of a given listing of files."""
@@ -373,7 +385,7 @@ def DecompressReleaseFiles():
     """Decompresses the Release and Source files."""
     releaseFiles = []
     for source in sources:
-        releaseFiles += source.GetReleaseFiles()
+        releaseFiles += source.GetReleaseFiles(True) # Unmodified files only
 
     print()
 
@@ -419,6 +431,7 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
 
     indexFile = Index(f"{Settings.SkelPath()}/{path}/{index}")
     indexFile.Read()
+    logging.debug(f"Processing Index file: {Settings.SkelPath()}/{path}/{index}")
 
     packages = indexFile.GetPackages()
 
@@ -471,7 +484,45 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
                                 newFile.write(f"{uri}/{directory}/{fileName}\n")
                                 packageDownloads.append((f"{uri}/{directory}/{fileName}", size))
 
+    logger.debug("Packages to download:")
+    for pkg, _ in packageDownloads:
+        logger.debug(f"\t{pkg}")
+
     return packageDownloads
+
+def ProcessUnmodifiedIndex(uri: str, index: str):
+    """Processes each package listed in the Index file.
+
+       For each Package that is found in the Index file,
+       it is checked to see whether the file exists in the
+       local mirror, and if not, adds it to the collection
+       for download.
+    """
+    path = SanitiseUri(uri)
+
+    indexFile = Index(f"{Settings.SkelPath()}/{path}/{index}")
+    indexFile.Read()
+    logging.debug(f"Processing Index file: {Settings.SkelPath()}/{path}/{index}")
+
+    packages = indexFile.GetPackages()
+
+    for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages", leave=False, delay=0.5):
+        if "Filename" in package:
+            # Packages Index
+            filename = package["Filename"]
+            filesToKeep.append(f"{path}/{filename}")
+        else:
+            # Sources Index
+            for key, value in package.items():
+                if "Files" in key:
+                    files = list(filter(None, value.splitlines())) # type: list[str]
+                    for file in files:
+                        directory = package["Directory"]
+                        sourceFile = file.split(" ")
+
+                        fileName = sourceFile[2]
+
+                        filesToKeep.append(f"{path}/{directory}/{fileName}")
 
 def NeedUpdate(path: str, size: int) -> bool:
     """Determine whether a file needs updating.

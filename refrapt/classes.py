@@ -128,7 +128,7 @@ class Source:
                     for architecture in self._architectures:
                         if Settings.Contents():
                             for compressionFormat in compressionFormats:
-                                indexes.append(f"{baseUrl}{component}/Contents-{architecture}")
+                                indexes.append(f"{baseUrl}{component}/Contents-{architecture}{compressionFormat}")
 
                         indexes.append(f"{baseUrl}{component}/binary-{architecture}/Release")
 
@@ -155,9 +155,13 @@ class Source:
     def Timestamp(self):
         self._indexCollection.DetermineDownloadTimestamps()
 
-    def GetReleaseFiles(self) -> list:
+    def GetReleaseFiles(self, modified: bool) -> list:
         """Get a list of all Release files for the Source."""
-        return self._indexCollection.Files
+
+        if modified:
+            return self._indexCollection.Files
+        else:
+            return self._indexCollection.UnmodifiedFiles
 
     def GetTranslationIndexes(self) -> list:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
@@ -234,13 +238,13 @@ class Source:
                         filename = parts[2].rstrip()
 
                         if indexType == IndexType.Release:
-                            if re.match(rf"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
+                            if re.match(rf"{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
                                 indexes.append(indexUri + filename)
                                 if Settings.ByHash():
                                     indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
                         elif indexType == IndexType.Dep11:
                             for arch in self._architectures:
-                                if re.match(rf"^{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
+                                if re.match(rf"{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
                                     indexes.append(indexUri + filename)
                             if Settings.ByHash():
                                 indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
@@ -371,6 +375,19 @@ class IndexCollection:
             for architecture in self._indexCollection[component]:
                 for file in self._indexCollection[component][architecture]:
                     if self._indexCollection[component][architecture][file].Modified or Settings.Force():
+                        filename, _ = os.path.splitext(file)
+                        files.append(filename)
+
+        return list(set(files)) # Ensure uniqueness
+
+    @property
+    def UnmodifiedFiles(self) -> list:
+        files = [] # type: list[str]
+
+        for component in self._indexCollection:
+            for architecture in self._indexCollection[component]:
+                for file in self._indexCollection[component][architecture]:
+                    if not self._indexCollection[component][architecture][file].Modified:
                         filename, _ = os.path.splitext(file)
                         files.append(filename)
 

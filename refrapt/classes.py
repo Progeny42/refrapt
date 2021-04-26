@@ -226,7 +226,7 @@ class Source:
                     if re.search("^ +(.*)$", line):
                         parts = list(filter(None, line.split(" ")))
 
-                        # parts[0] = sha1
+                        # parts[0] = checksum
                         # parts[1] = size
                         # parts[2] = filename
 
@@ -238,24 +238,28 @@ class Source:
                         filename = parts[2].rstrip()
 
                         if indexType == IndexType.Release:
-                            if re.match(rf"{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
+                            if re.search(rf"{component}/i18n/Translation-{Settings.Language()}[^./]*(\.gz|\.bz2|\.xz|$)$", filename):
                                 indexes.append(indexUri + filename)
-                                if Settings.ByHash():
-                                    indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
+                            if Settings.ByHash():
+                                indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
                         elif indexType == IndexType.Dep11:
                             for arch in self._architectures:
-                                if re.match(rf"{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
+                                if re.search(rf"{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
                                     indexes.append(indexUri + filename)
                             if Settings.ByHash():
                                 indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
-                        else:
-                            indexes.append(baseUri + filename)
+                        elif indexType == IndexType.Index:
+                            if "Translation-" in filename:
+                                if re.search(rf"Translation-{Settings.Language()}[^./]*(\.gz|\.bz2|\.xz|$)$", baseUri + filename):
+                                    indexes.append(baseUri + filename)
+                            else:
+                                indexes.append(baseUri + filename)
                     else:
                         checksums = False
                 else:
                     checksums = "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line
 
-        return indexes
+        return list(set(indexes)) # Remove duplicates
 
     @property
     def SourceType(self) -> SourceType:

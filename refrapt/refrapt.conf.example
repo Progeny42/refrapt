@@ -73,6 +73,10 @@ set logLevel           = INFO
 set test               = False
 # Specify whether Refrapt should download the /by-hash/* directories and contents for each available checksum.
 set byHash             = False
+# Limits the download of Translation files for that of your locale. When not specified, Refrapt will default to locale.getdefaultlocale().
+# Note that "_XX" languages will be stripped of the locale to collect a wider number of files. Ie "en_GB" becomes "en", which will capture 
+# files with the same base language, but different locales.
+# set language           = "en_GB"
 
 #################
 ## SOURCE LIST ##

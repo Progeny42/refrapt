@@ -53,8 +53,10 @@ set privateKey         = ""
 # Note that this will be multipled by the number of threads specified.
 # See Wget manpage for correct syntax
 set limitRate          = 500m # 500 MB
-# Currently unused - Potential to be used for limiting the Translation Indexes to those for the current locale.
-set language           = en 
+# Limits the download of Translation files for that of your locale. When not specified, Refrapt will default to locale.getdefaultlocale().
+# Note that "_XX" languages will be stripped of the locale to collect a wider number of files. Ie "en_GB" becomes "en", which will capture 
+# files with the same base language, but different locales.
+# set language           = "en_GB"
 # Tell Refrapt to update all files, regardless of whether they are deemed to have changed or not.
 # Note that if Wget determines the files are unchanged (via Timestamping), this will have no effect.
 # The use of this should be limited for when you know a package has changed, but the size has not 
@@ -73,10 +75,6 @@ set logLevel           = INFO
 set test               = False
 # Specify whether Refrapt should download the /by-hash/* directories and contents for each available checksum.
 set byHash             = False
-# Limits the download of Translation files for that of your locale. When not specified, Refrapt will default to locale.getdefaultlocale().
-# Note that "_XX" languages will be stripped of the locale to collect a wider number of files. Ie "en_GB" becomes "en", which will capture 
-# files with the same base language, but different locales.
-# set language           = "en_GB"
 
 #################
 ## SOURCE LIST ##

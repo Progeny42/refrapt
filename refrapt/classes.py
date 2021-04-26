@@ -106,7 +106,6 @@ class Source:
             indexes.append(baseUrl + "Release")
             indexes.append(baseUrl + "Release.gpg")
         else:
-            # Flat Repositories
             indexes.append(self._uri + "/" + self._distribution + "/InRelease")
             indexes.append(self._uri + "/" + self._distribution + "/Release")
             indexes.append(self._uri + "/" + self._distribution + "/Release.gpg")
@@ -153,6 +152,7 @@ class Source:
         return indexes
 
     def Timestamp(self):
+        """Get the timestamps for all registered index files after they have been downloaded."""
         self._indexCollection.DetermineDownloadTimestamps()
 
     def GetReleaseFiles(self, modified: bool) -> list:
@@ -189,7 +189,7 @@ class Source:
         dep11Files = []
 
         for component in self._components:
-            dep11Files += self.__ProcessLine(releasePath, IndexType.Dep11, baseUrl, "", component)
+            dep11Files += self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl, "", component)
 
         return dep11Files
 
@@ -206,11 +206,11 @@ class Source:
         if not os.path.isfile(indexPath):
             releaseUri = url + "Release"
             releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-            return self.__ProcessLine(releasePath, IndexType.Release, url, "", component)
+            return self.__ProcessIndex(releasePath, IndexType.Release, url, "", component)
         else:
-            return self.__ProcessLine(indexPath, IndexType.Index, indexUri, baseUri, "")
+            return self.__ProcessIndex(indexPath, IndexType.Index, indexUri, baseUri, "")
 
-    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
+    def __ProcessIndex(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
         """Parses an Index file for all filenames."""
         checksums = False
 
@@ -298,32 +298,42 @@ class Source:
         return len(self._indexCollection.Files) > 0
 
 class Timestamp:
+    """Simple Timestamp class for measuring before and after of a file."""
     def __init__(self):
+        """Initialise timestamps to 0.0."""
         self._currentTimestamp = 0.0
         self._downloadedTimestamp = 0.0
 
     @property
     def Current(self) -> float:
+        """Get the Timestamp of the file before download. Will be 0.0 if the file does not exist."""
         return self._currentTimestamp
 
     @Current.setter
     def Current(self, timestamp: float):
+        """Set the Timestamp of the file before download."""
         self._currentTimestamp = timestamp
 
     @property
     def Download(self) -> float:
+        """Get the Timestamp of the file after download."""
         return self._downloadedTimestamp
 
     @Download.setter
     def Download(self, timestamp: float):
+        """Set the Timestamp of the file after download."""
         self._downloadedTimestamp = timestamp
 
     @property
     def Modified(self) -> bool:
+        """Get whether the file has been modified."""
         return self._currentTimestamp != self._downloadedTimestamp
 
 class IndexCollection:
+    """A collection of all possible Index files for a Source."""
+
     def __init__(self, components: list, architectures: list):
+        """Initialises an Index Collection with a dictionary of each Component and Architecture."""
         self._indexCollection = collections.defaultdict(lambda : collections.defaultdict(dict)) # type: dict[str, dict[str, dict[str, Timestamp]]] # For each component, each architecture, for each file, timestamp
 
         # Initialise the Index Collection
@@ -332,11 +342,14 @@ class IndexCollection:
                 self._indexCollection[component][architecture] = dict()
 
     def Add(self, component: str, architecture: str, file: str):
+        """Add a file to the collection for a given Component and Architecture."""
         self._indexCollection[component][architecture][SanitiseUri(file)] = Timestamp()
 
     def DetermineCurrentTimestamps(self):
+        """For each file stored in this collection, determine the current Modified timestamp of the file, and record it."""
+
         logger.debug("Getting timestamps of current files in Skel (if available)")
-        # Now we have built our index collection, gather timestamps for all the files (that exist)
+        # Gather timestamps for all files (that exist)
         for component in self._indexCollection:
             for architecture in self._indexCollection[component]:
                 for file in self._indexCollection[component][architecture]:
@@ -345,6 +358,11 @@ class IndexCollection:
                         logger.debug(f"\tCurrent: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Current}")
 
     def DetermineDownloadTimestamps(self):
+        """For each file stored in this collection, determine the current Modified timestamp of the file, and record it.
+
+           If a file does not exist on disk after the download, then it will be removed from this collection.
+        """
+
         logger.debug("Getting timestamps of downloaded files in Skel")
         removables = collections.defaultdict(dict) # type: dict[str, dict[str, list[str]]]
         for component in self._indexCollection:
@@ -358,10 +376,11 @@ class IndexCollection:
                         self._indexCollection[component][architecture][file].Download = os.path.getmtime(Path(f"{Settings.SkelPath()}/{SanitiseUri(file)}"))
                         logger.debug(f"\tDownload: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Download}")
                     else:
-                        # File does not exist after download, therefore it does not exist, and can marked for removal.
+                        # File does not exist after download, therefore it does not exist, and can be marked for removal
                         removables[component][architecture].append(file)
-                        logger.debug(f"\tMarked for removal (does not exist): [{component}] [{architecture}] [{file}]: ")
+                        logger.debug(f"\tMarked for removal (does not exist): [{component}] [{architecture}] [{file}]")
 
+        # Remove marked files
         for component in removables:
             for architecture in removables[component]:
                 for file in removables[component][architecture]:
@@ -369,6 +388,7 @@ class IndexCollection:
 
     @property
     def Files(self) -> list:
+        """Get a list of all modified files in this collection or all if Force is enabled."""
         files = [] # type: list[str]
 
         for component in self._indexCollection:
@@ -378,10 +398,18 @@ class IndexCollection:
                         filename, _ = os.path.splitext(file)
                         files.append(filename)
 
-        return list(set(files)) # Ensure uniqueness
+        return list(set(files)) # Ensure uniqueness due to stripped extension
 
     @property
     def UnmodifiedFiles(self) -> list:
+        """Get a list of all unmodified files in this collection.
+
+           Will return nothing if Force is enabled as Files will return all of them in this case.
+        """
+
+        if Settings.Force():
+            return []
+
         files = [] # type: list[str]
 
         for component in self._indexCollection:
@@ -391,7 +419,7 @@ class IndexCollection:
                         filename, _ = os.path.splitext(file)
                         files.append(filename)
 
-        return list(set(files)) # Ensure uniqueness
+        return list(set(files)) # Ensure uniqueness due to stripped extension
 
 @dataclass
 class Downloader:

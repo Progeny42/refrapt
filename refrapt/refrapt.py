@@ -321,7 +321,7 @@ def Clean():
 
     # In order to not end up removing files that are listed in Indexes
     # that were not processed in previous steps, we do need to read the
-    # remainder of the Packages and Sources files in for the URI in order
+    # remainder of the Packages and Sources files in for the source in order
     # to build a full list of maintained files.
     for source in tqdm.tqdm(allUriSources, position=0, unit=" source", desc="Sources "):
         releaseFiles = source.GetReleaseFiles(False) # Gets unmodified release files
@@ -354,8 +354,9 @@ def Clean():
         logger.debug(item)
 
     # Calculate size of items to clean
+    logger.info("Calculated space savings...")
     clearSize = 0
-    for file in items:
+    for file in tqdm.tqdm(items, unit=" files"):
         clearSize += os.path.getsize(file)
 
     if clearSize == 0:

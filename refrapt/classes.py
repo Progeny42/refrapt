@@ -9,6 +9,8 @@ from functools import partial
 import tqdm
 import filelock
 from dataclasses import dataclass
+import collections
+from pathlib import Path
 
 from refrapt.helpers import SanitiseUri
 from refrapt.settings import Settings
@@ -43,6 +45,7 @@ class Source:
         self._distribution = None
         self._components = [] # type: list[str]
         self._clean = True
+        self._flatRepository = False
 
         # Remove any inline comments
         if "#" in line:
@@ -70,8 +73,17 @@ class Source:
             self._architectures.append(defaultArch)
 
         self._uri           = elements[elementIndex]
-        self._distribution  = elements[elementIndex + 1]
-        self._components    = elements[elementIndex + 2:]
+
+        # Handle flat repositories
+        if len(elements) > elementIndex + 1:
+            self._distribution = elements[elementIndex + 1]
+            self._components   = elements[elementIndex + 2:]
+        else:
+            self._distribution = ""
+            self._components = ["Flat"]
+            self._flatRepository = True
+
+        self._indexCollection = IndexCollection(self._components, self._architectures)
 
         logger.debug("Source")
         logger.debug(f"\tKind:         {self._sourceType}")
@@ -79,46 +91,51 @@ class Source:
         logger.debug(f"\tUri:          {self._uri}")
         logger.debug(f"\tDistribution: {self._distribution}")
         logger.debug(f"\tComponents:   {self._components}")
+        logger.debug(f"\tIndex Coll:   {self._indexCollection}")
+        logger.debug(f"\tFlat:         {self._flatRepository}")
 
     def GetIndexes(self) -> list:
         """Get a list of all Indexes for the Source."""
         baseUrl = self._uri + "/dists/" + self._distribution + "/"
 
         indexes = []
+        compressionFormats = [".gz", ".bz2", ".xz"]
 
         if self._components:
             indexes.append(baseUrl + "InRelease")
             indexes.append(baseUrl + "Release")
             indexes.append(baseUrl + "Release.gpg")
         else:
+            indexes.append(self._uri + "/" + self._distribution + "/InRelease")
             indexes.append(self._uri + "/" + self._distribution + "/Release")
             indexes.append(self._uri + "/" + self._distribution + "/Release.gpg")
-            indexes.append(self._uri + "/" + self._distribution + "/Sources.gz")
-            indexes.append(self._uri + "/" + self._distribution + "/Sources.bz2")
-            indexes.append(self._uri + "/" + self._distribution + "/Sources.xz")
+            for compressionFormat in compressionFormats:
+                indexes.append(self._uri + "/" + self._distribution + "/Sources" + compressionFormat)
+                indexes.append(self._uri + "/" + self._distribution + "/Packages" + compressionFormat)
+                self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Sources" + compressionFormat)
+                self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Packages" + compressionFormat)
 
         if self._sourceType == SourceType.Bin:
             # Binary Files
             if self._components:
                 if Settings.Contents():
                     for architecture in self._architectures:
-                        indexes.append(baseUrl + "Contents-" + architecture + ".gz")
-                        indexes.append(baseUrl + "Contents-" + architecture + ".bz2")
-                        indexes.append(baseUrl + "Contents-" + architecture + ".xz")
+                        for compressionFormat in compressionFormats:
+                            indexes.append(baseUrl + "Contents-" + architecture + compressionFormat)
 
                 for component in self._components:
                     for architecture in self._architectures:
                         if Settings.Contents():
-                            indexes.append(baseUrl + component + "/Contents-" + architecture + ".gz")
-                            indexes.append(baseUrl + component + "/Contents-" + architecture + ".bz2")
-                            indexes.append(baseUrl + component + "/Contents-" + architecture + ".xz")
+                            for compressionFormat in compressionFormats:
+                                indexes.append(f"{baseUrl}{component}/Contents-{architecture}{compressionFormat}")
 
-                        indexes.append(baseUrl + component + "/binary-" + architecture + "/Release")
-                        indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages.gz")
-                        indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages.bz2")
-                        indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages.xz")
-                        indexes.append(baseUrl + component + "/cnf/Commands-" + architecture + ".xz")
-                        indexes.append(baseUrl + component + "/i18n/cnf/Commands-" + architecture + ".xz")
+                        indexes.append(f"{baseUrl}{component}/binary-{architecture}/Release")
+
+                        for compressionFormat in compressionFormats:
+                            indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
+                            self._indexCollection.Add(component, architecture, baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
+                            indexes.append(baseUrl + component + "/cnf/Commands-" + architecture + compressionFormat)
+                            indexes.append(baseUrl + component + "/i18n/cnf/Commands-" + architecture + compressionFormat)
 
                     indexes.append(baseUrl + component + "/i18n/Index")
         elif self._sourceType == SourceType.Src:
@@ -126,45 +143,25 @@ class Source:
             if self._components:
                 for component in self._components:
                     indexes.append(baseUrl + component + "/source/Release")
-                    indexes.append(baseUrl + component + "/source/Sources.gz")
-                    indexes.append(baseUrl + component + "/source/Sources.bz2")
-                    indexes.append(baseUrl + component + "/source/Sources.xz")
+                    for compressionFormat in compressionFormats:
+                        indexes.append(baseUrl + component + "/source/Sources" + compressionFormat)
+                        self._indexCollection.Add(component, self._architectures[0], baseUrl + component + "/source/Sources" + compressionFormat)
+
+        self._indexCollection.DetermineCurrentTimestamps()
 
         return indexes
 
-    def GetReleaseFiles(self) -> list:
+    def Timestamp(self):
+        """Get the timestamps for all registered index files after they have been downloaded."""
+        self._indexCollection.DetermineDownloadTimestamps()
+
+    def GetReleaseFiles(self, modified: bool) -> list:
         """Get a list of all Release files for the Source."""
-        if self._sourceType == SourceType.Src:
-            return self.__GetSourceIndexes()
-        elif self._sourceType == SourceType.Bin:
-            return self.__GetPackageIndexes()
+
+        if modified:
+            return self._indexCollection.Files
         else:
-            return []
-
-    def __GetSourceIndexes(self) -> list:
-        """Get a list of all Indexes for the Source if it represents a deb-src mirror."""
-        indexes = []
-
-        if self._components:
-            for component in self._components:
-                indexes.append(f"{SanitiseUri(self._uri)}/dists/{self._distribution}/{component}/source/Sources")
-        else:
-            indexes.append(f"{SanitiseUri(self._uri)}/{self._distribution}/Sources")
-
-        return indexes
-
-    def __GetPackageIndexes(self) -> list:
-        """Get a list of all Indexes for the Source if it represents a deb mirror."""
-        indexes = []
-
-        if self._components:
-            for arch in self._architectures:
-                for component in self._components:
-                    indexes.append(f"{SanitiseUri(self._uri)}/dists/{self._distribution}/{component}/binary-{arch}/Packages")
-        else:
-            indexes.append(f"{SanitiseUri(self._uri)}/{self._distribution}/Packages")
-
-        return indexes
+            return self._indexCollection.UnmodifiedFiles
 
     def GetTranslationIndexes(self) -> list:
         """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
@@ -192,7 +189,7 @@ class Source:
         dep11Files = []
 
         for component in self._components:
-            dep11Files += self.__ProcessLine(releasePath, IndexType.Dep11, baseUrl, "", component)
+            dep11Files += self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl, "", component)
 
         return dep11Files
 
@@ -209,11 +206,11 @@ class Source:
         if not os.path.isfile(indexPath):
             releaseUri = url + "Release"
             releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-            return self.__ProcessLine(releasePath, IndexType.Release, url, "", component)
+            return self.__ProcessIndex(releasePath, IndexType.Release, url, "", component)
         else:
-            return self.__ProcessLine(indexPath, IndexType.Index, indexUri, baseUri, "")
+            return self.__ProcessIndex(indexPath, IndexType.Index, indexUri, baseUri, "")
 
-    def __ProcessLine(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
+    def __ProcessIndex(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
         """Parses an Index file for all filenames."""
         checksums = False
 
@@ -241,13 +238,13 @@ class Source:
                         filename = parts[2].rstrip()
 
                         if indexType == IndexType.Release:
-                            if re.match(rf"^{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
+                            if re.match(rf"{component}/i18n/Translation-[^./]*\.(gz|bz2|xz)$", filename):
                                 indexes.append(indexUri + filename)
                                 if Settings.ByHash():
                                     indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
                         elif indexType == IndexType.Dep11:
                             for arch in self._architectures:
-                                if re.match(rf"^{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
+                                if re.match(rf"{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
                                     indexes.append(indexUri + filename)
                             if Settings.ByHash():
                                 indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
@@ -294,6 +291,135 @@ class Source:
     def Clean(self, value: bool):
         """Sets whether the resulting directory should be cleaned."""
         self._clean = value
+
+    @property
+    def Modified(self) -> bool:
+        """Get whether any of the files in this source have been modified"""
+        return len(self._indexCollection.Files) > 0
+
+class Timestamp:
+    """Simple Timestamp class for measuring before and after of a file."""
+    def __init__(self):
+        """Initialise timestamps to 0.0."""
+        self._currentTimestamp = 0.0
+        self._downloadedTimestamp = 0.0
+
+    @property
+    def Current(self) -> float:
+        """Get the Timestamp of the file before download. Will be 0.0 if the file does not exist."""
+        return self._currentTimestamp
+
+    @Current.setter
+    def Current(self, timestamp: float):
+        """Set the Timestamp of the file before download."""
+        self._currentTimestamp = timestamp
+
+    @property
+    def Download(self) -> float:
+        """Get the Timestamp of the file after download."""
+        return self._downloadedTimestamp
+
+    @Download.setter
+    def Download(self, timestamp: float):
+        """Set the Timestamp of the file after download."""
+        self._downloadedTimestamp = timestamp
+
+    @property
+    def Modified(self) -> bool:
+        """Get whether the file has been modified."""
+        return self._currentTimestamp != self._downloadedTimestamp
+
+class IndexCollection:
+    """A collection of all possible Index files for a Source."""
+
+    def __init__(self, components: list, architectures: list):
+        """Initialises an Index Collection with a dictionary of each Component and Architecture."""
+        self._indexCollection = collections.defaultdict(lambda : collections.defaultdict(dict)) # type: dict[str, dict[str, dict[str, Timestamp]]] # For each component, each architecture, for each file, timestamp
+
+        # Initialise the Index Collection
+        for component in components:
+            for architecture in architectures:
+                self._indexCollection[component][architecture] = dict()
+
+    def Add(self, component: str, architecture: str, file: str):
+        """Add a file to the collection for a given Component and Architecture."""
+        self._indexCollection[component][architecture][SanitiseUri(file)] = Timestamp()
+
+    def DetermineCurrentTimestamps(self):
+        """For each file stored in this collection, determine the current Modified timestamp of the file, and record it."""
+
+        logger.debug("Getting timestamps of current files in Skel (if available)")
+        # Gather timestamps for all files (that exist)
+        for component in self._indexCollection:
+            for architecture in self._indexCollection[component]:
+                for file in self._indexCollection[component][architecture]:
+                    if os.path.isfile(f"{Settings.SkelPath()}/{file}"):
+                        self._indexCollection[component][architecture][file].Current = os.path.getmtime(Path(f"{Settings.SkelPath()}/{SanitiseUri(file)}"))
+                        logger.debug(f"\tCurrent: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Current}")
+
+    def DetermineDownloadTimestamps(self):
+        """For each file stored in this collection, determine the current Modified timestamp of the file, and record it.
+
+           If a file does not exist on disk after the download, then it will be removed from this collection.
+        """
+
+        logger.debug("Getting timestamps of downloaded files in Skel")
+        removables = collections.defaultdict(dict) # type: dict[str, dict[str, list[str]]]
+        for component in self._indexCollection:
+            for architecture in self._indexCollection[component]:
+                removables[component][architecture] = list()
+
+        for component in self._indexCollection:
+            for architecture in self._indexCollection[component]:
+                for file in self._indexCollection[component][architecture]:
+                    if os.path.isfile(f"{Settings.SkelPath()}/{file}"):
+                        self._indexCollection[component][architecture][file].Download = os.path.getmtime(Path(f"{Settings.SkelPath()}/{SanitiseUri(file)}"))
+                        logger.debug(f"\tDownload: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Download}")
+                    else:
+                        # File does not exist after download, therefore it does not exist, and can be marked for removal
+                        removables[component][architecture].append(file)
+                        logger.debug(f"\tMarked for removal (does not exist): [{component}] [{architecture}] [{file}]")
+
+        # Remove marked files
+        for component in removables:
+            for architecture in removables[component]:
+                for file in removables[component][architecture]:
+                    del self._indexCollection[component][architecture][file]
+
+    @property
+    def Files(self) -> list:
+        """Get a list of all modified files in this collection or all if Force is enabled."""
+        files = [] # type: list[str]
+
+        for component in self._indexCollection:
+            for architecture in self._indexCollection[component]:
+                for file in self._indexCollection[component][architecture]:
+                    if self._indexCollection[component][architecture][file].Modified or Settings.Force():
+                        filename, _ = os.path.splitext(file)
+                        files.append(filename)
+
+        return list(set(files)) # Ensure uniqueness due to stripped extension
+
+    @property
+    def UnmodifiedFiles(self) -> list:
+        """Get a list of all unmodified files in this collection.
+
+           Will return nothing if Force is enabled as Files will return all of them in this case.
+        """
+
+        if Settings.Force():
+            return []
+
+        files = [] # type: list[str]
+
+        for component in self._indexCollection:
+            for architecture in self._indexCollection[component]:
+                for file in self._indexCollection[component][architecture]:
+                    if not self._indexCollection[component][architecture][file].Modified:
+                        filename, _ = os.path.splitext(file)
+                        files.append(filename)
+
+        return list(set(files)) # Ensure uniqueness due to stripped extension
 
 @dataclass
 class Downloader:

@@ -30,8 +30,9 @@ class Settings:
         "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
         "logLevel"          : "INFO",
         "test"              : False,
-        "byHash"            : False
+        "byHash"            : False,
     }
+    _force = False
 
     @staticmethod
     def Parse(config: list):
@@ -178,3 +179,13 @@ class Settings:
     def ByHash() -> bool:
         """Get whether the by-hash directories should be included in downloads."""
         return bool(Settings._settings["byHash"])
+
+    @staticmethod
+    def SetForce():
+        """Set whether the application should force full processing in the event of an interrupted run."""
+        Settings._force = True
+
+    @staticmethod
+    def Force() -> bool:
+        """Get whether the application should force full processing in the event of an interrupted run."""
+        return bool(Settings._force)

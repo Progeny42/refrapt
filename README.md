@@ -11,13 +11,14 @@ Refrapt was developed on Windows, but intended for use on a Linux machine.
 ## Features
 -------------
 If you've used `apt-mirror`, this should be familiar. However, there are a handful of new features available:
+* Faster overall processing than `apt-mirror`, by intelligently checking whether a file has been modified after the download process, cutting down on processing files that have not changed.
 * Progress Bars for each step of the application, and especially for downloads.
 * Downloads and decompression tasks are multithreaded, by using `multiprocessing.Pools`, which leads to a more efficient use of threads when one thread is taking longer than others.
 * Support for multiple architectures per line. No more duplicating lines with just a change to the `[arch=X]` parameter!
 * SSL support for Wget. Simply populate the correct fields in the configuration file.
 * Logging is now also performed to a file as well as the Console. Log files are limited in size to 500MB, and retain the last 3 copies.
 * Download of `Contents-[arch].*` files is configurable via the configuration file.
-* Download of `/`by-hash/*` directories is configurable via the configuration file.
+* Download of `/by-hash/*` directories is configurable via the configuration file.
 * Test mode to prevent doing the main download.
 * Automatic cleaning of directories after mirroring.
 * Safer partial download recovery in the event Refrapt is interrupted via file locking and detection at script start (see the section on partial downloads for an explanation).

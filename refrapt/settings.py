@@ -2,6 +2,7 @@ import multiprocessing
 import logging
 from pathlib import Path
 import platform
+import locale
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class Settings:
         "caCertificate"     : None,
         "privateKey"        : None,
         "limitRate"         : "500m", # Wget syntax
-        "language"          : "en",   # TODO : Default to locale
+        "language"          : locale.getdefaultlocale()[0],
         "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
         "logLevel"          : "INFO",
         "test"              : False,
@@ -54,6 +55,10 @@ class Settings:
                     logger.debug(f"Parsed setting: {key} = {Settings._settings.get(key)}")
                 else:
                     logger.warn(f"Unknown setting in configuration file '{line}'")
+
+        # Shorten specific locales like en_GB to en to catch more files
+        if "_" in Settings.Language():
+            Settings._settings["language"] = Settings.Language().split("_")[0]
 
     @staticmethod
     def Test() -> bool:

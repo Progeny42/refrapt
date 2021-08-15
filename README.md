@@ -25,9 +25,11 @@ If you've used `apt-mirror`, this should be familiar. However, there are a handf
 
 # Getting Started
 -------------
+You will require Python 3.9 in order to install and run `refrapt`.
+
 To install Refrapt, run the following `pip` command:
 ```sh
-pip3 install refrapt
+python3.9 -m pip install refrapt
 ```
 
 The first time Refrapt is run, a default configuration file will be installed at ~/refrapt/refrapt.conf. To specify a custom location, issue the following command:

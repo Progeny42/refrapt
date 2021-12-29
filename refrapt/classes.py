@@ -75,12 +75,12 @@ class Source:
         self._uri           = elements[elementIndex]
 
         # Handle flat repositories
-        if len(elements) > elementIndex + 1:
+        if len(elements) > elementIndex + 1 and not elements[elementIndex + 1] == "/":
             self._distribution = elements[elementIndex + 1]
             self._components   = elements[elementIndex + 2:]
         else:
             self._distribution = ""
-            self._components = ["Flat"]
+            self._components = []
             self._flatRepository = True
 
         self._indexCollection = IndexCollection(self._components, self._architectures)
@@ -96,24 +96,26 @@ class Source:
 
     def GetIndexes(self) -> list:
         """Get a list of all Indexes for the Source."""
-        baseUrl = self._uri + "/dists/" + self._distribution + "/"
+
+        baseUrl = self._uri + "/"
+        if not self._flatRepository:
+            baseUrl += "dists/" + self._distribution + "/"
 
         indexes = []
         compressionFormats = [".gz", ".bz2", ".xz"]
 
-        if self._components:
-            indexes.append(baseUrl + "InRelease")
-            indexes.append(baseUrl + "Release")
-            indexes.append(baseUrl + "Release.gpg")
-        else:
-            indexes.append(self._uri + "/" + self._distribution + "/InRelease")
-            indexes.append(self._uri + "/" + self._distribution + "/Release")
-            indexes.append(self._uri + "/" + self._distribution + "/Release.gpg")
+        indexes.append(baseUrl + "InRelease")
+        indexes.append(baseUrl + "Release")
+        indexes.append(baseUrl + "Release.gpg")
+
+        if not self._components:
             for compressionFormat in compressionFormats:
-                indexes.append(self._uri + "/" + self._distribution + "/Sources" + compressionFormat)
-                indexes.append(self._uri + "/" + self._distribution + "/Packages" + compressionFormat)
-                self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Sources" + compressionFormat)
-                self._indexCollection.Add(self._components[0], self._architectures[0], self._uri + "/" + self._distribution + "/Packages" + compressionFormat)
+                indexes.append(self._uri + "/Sources" + compressionFormat)
+                indexes.append(self._uri + "/Packages" + compressionFormat)
+
+                for architecture in self._architectures:
+                    self._indexCollection.Add("Flat", architecture, self._uri + "/Sources" + compressionFormat)
+                    self._indexCollection.Add("Flat", architecture, self._uri + "/Packages" + compressionFormat)
 
         if self._sourceType == SourceType.Bin:
             # Binary Files
@@ -130,6 +132,7 @@ class Source:
                                 indexes.append(f"{baseUrl}{component}/Contents-{architecture}{compressionFormat}")
 
                         indexes.append(f"{baseUrl}{component}/binary-{architecture}/Release")
+                        indexes.append(f"{baseUrl}{component}/binary-{architecture}/Packages")
 
                         for compressionFormat in compressionFormats:
                             indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
@@ -168,12 +171,15 @@ class Source:
         if self._sourceType != SourceType.Bin:
             return []
 
-        baseUrl = self._uri + "/dists/" + self._distribution + "/"
-
         translationIndexes = []
 
-        for component in self._components:
-            translationIndexes += self.__ProcessTranslationIndex(baseUrl, component)
+        if self._flatRepository:
+            translationIndexes = self.__ProcessTranslationIndex(self._uri + "/", "")
+        else:
+            baseUrl = self._uri + "/dists/" + self._distribution + "/"
+
+            for component in self._components:
+                translationIndexes += self.__ProcessTranslationIndex(baseUrl, component)
 
         return translationIndexes
 
@@ -182,14 +188,21 @@ class Source:
         if self._sourceType != SourceType.Bin:
             return []
 
-        baseUrl = self._uri + "/dists/" + self._distribution + "/"
-        releaseUri = baseUrl + "Release"
-        releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-
         dep11Files = []
 
-        for component in self._components:
-            dep11Files += self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl, "", component)
+        if self._flatRepository:
+            baseUrl = self._uri + "/"
+            releaseUri = baseUrl + "Release"
+            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
+
+            dep11Files = self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl)
+        else:
+            baseUrl = self._uri + "/dists/" + self._distribution + "/"
+            releaseUri = baseUrl + "Release"
+            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
+
+            for component in self._components:
+                dep11Files += self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl, "", component)
 
         return dep11Files
 
@@ -199,6 +212,11 @@ class Source:
            Falls back to parsing /dists/$DIST/Release if /i18n/Index is not found.
         """
 
+        if self._flatRepository:
+            releaseUri = url + "Release"
+            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
+            return self.__ProcessIndex(releasePath, IndexType.Release, url)
+
         baseUri = url + component + "/i18n/"
         indexUri = baseUri + "Index"
         indexPath = Settings.SkelPath() + "/" + SanitiseUri(indexUri)
@@ -207,8 +225,8 @@ class Source:
             releaseUri = url + "Release"
             releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
             return self.__ProcessIndex(releasePath, IndexType.Release, url, "", component)
-        else:
-            return self.__ProcessIndex(indexPath, IndexType.Index, indexUri, baseUri, "")
+
+        return self.__ProcessIndex(indexPath, IndexType.Index, indexUri, baseUri, "")
 
     def __ProcessIndex(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
         """Parses an Index file for all filenames."""
@@ -221,6 +239,7 @@ class Source:
                 if "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line:
                     checksumType = line
                     checksumType = checksumType.replace(":", "").strip()
+                    checksums = False
 
                 if checksums:
                     if re.search("^ +(.*)$", line):
@@ -380,7 +399,7 @@ class IndexCollection:
                         self._indexCollection[component][architecture][file].Download = os.path.getmtime(Path(f"{Settings.SkelPath()}/{SanitiseUri(file)}"))
                         logger.debug(f"\tDownload: [{component}] [{architecture}] [{file}]: {self._indexCollection[component][architecture][file].Download}")
                     else:
-                        # File does not exist after download, therefore it does not exist, and can be marked for removal
+                        # File does not exist after download, therefore it does not exist in the repository, and can be marked for removal
                         removables[component][architecture].append(file)
                         logger.debug(f"\tMarked for removal (does not exist): [{component}] [{architecture}] [{file}]")
 

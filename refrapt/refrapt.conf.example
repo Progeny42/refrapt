@@ -91,6 +91,9 @@ set byHash             = False
 # Source mirror
 # deb-src http://gb.archive.ubuntu.com/ubuntu focal main
 
+# Flat repository
+# deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64
+
 ###################
 ## DISABLE CLEAN ##
 ###################

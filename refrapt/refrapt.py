@@ -128,7 +128,7 @@ def main(conf: str, test: bool):
         logger.debug("Adding Index Files to filesToKeep:")
         for index in indexFiles:
             logger.debug(f"\t{SanitiseUri(index)}")
-            filesToKeep.append(SanitiseUri(index))
+            filesToKeep.append(os.path.normpath(SanitiseUri(index)))
 
         print()
         logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
@@ -145,7 +145,7 @@ def main(conf: str, test: bool):
         logger.debug("Adding Translation Files to filesToKeep:")
         for translationFile in translationFiles:
             logger.debug(f"\t{SanitiseUri(translationFile)}")
-            filesToKeep.append(SanitiseUri(translationFile))
+            filesToKeep.append(os.path.normpath(SanitiseUri(translationFile)))
 
         print()
         logger.info(f"Compiled a list of {len(translationFiles)} Translation files for download")
@@ -159,7 +159,7 @@ def main(conf: str, test: bool):
         logger.debug("Adding dep11 Files to filesToKeep:")
         for dep11File in dep11Files:
             logger.debug(f"\t{SanitiseUri(dep11File)}")
-            filesToKeep.append(SanitiseUri(dep11File))
+            filesToKeep.append(os.path.normpath(SanitiseUri(dep11File)))
 
         print()
         logger.info(f"Compiled a list of {len(dep11Files)} Dep11 files for download")
@@ -347,14 +347,14 @@ def Clean():
                 walked.append(os.path.join(root, file))
 
         logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
-        items += [x for x in walked if x not in requiredFiles and not os.path.islink(x)]
+        items += [x for x in walked if os.path.normpath(x) not in requiredFiles and not os.path.islink(x)]
 
     logger.debug(f"Found {len(items)} which can be freed")
     for item in items:
         logger.debug(item)
 
     # Calculate size of items to clean
-    logger.info("Calculated space savings...")
+    logger.info("Calculating space savings...")
     clearSize = 0
     for file in tqdm.tqdm(items, unit=" files"):
         clearSize += os.path.getsize(file)
@@ -448,7 +448,11 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
             if "Filename" in package:
                 # Packages Index
                 filename = package["Filename"]
-                filesToKeep.append(f"{path}/{filename}")
+
+                if filename.startswith("./"):
+                    filename = filename[2:]
+
+                filesToKeep.append(os.path.normpath(f"{path}/{filename}"))
                 allFile.write(f"{path}/{filename}\n")
                 if "MD5sum" in package:
                     checksum = package["MD5sum"]
@@ -476,7 +480,10 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
                             size = int(sourceFile[1])
                             fileName = sourceFile[2]
 
-                            filesToKeep.append(f"{path}/{directory}/{fileName}")
+                            if filename.startswith("./"):
+                                filename = filename[2:]
+
+                            filesToKeep.append(os.path.normpath(f"{path}/{directory}/{fileName}"))
 
                             allFile.write(f"{path}/{directory}/{fileName}\n")
                             md5File.write(f"{md5} {path}/{directory}/{fileName}\n")
@@ -511,7 +518,7 @@ def ProcessUnmodifiedIndex(uri: str, index: str):
         if "Filename" in package:
             # Packages Index
             filename = package["Filename"]
-            filesToKeep.append(f"{path}/{filename}")
+            filesToKeep.append(os.path.normpath(f"{path}/{filename}"))
         else:
             # Sources Index
             for key, value in package.items():
@@ -523,7 +530,7 @@ def ProcessUnmodifiedIndex(uri: str, index: str):
 
                         fileName = sourceFile[2]
 
-                        filesToKeep.append(f"{path}/{directory}/{fileName}")
+                        filesToKeep.append(os.path.normpath(f"{path}/{directory}/{fileName}"))
 
 def NeedUpdate(path: str, size: int) -> bool:
     """Determine whether a file needs updating.

@@ -54,7 +54,7 @@ class Settings:
 
                     logger.debug(f"Parsed setting: {key} = {Settings._settings.get(key)}")
                 else:
-                    logger.warn(f"Unknown setting in configuration file '{line}'")
+                    logger.warning(f"Unknown setting in configuration file '{line}'")
 
         # Shorten specific locales like en_GB to en to catch more files
         if "_" in Settings.Language():

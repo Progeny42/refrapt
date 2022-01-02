@@ -176,7 +176,9 @@ class Source:
 
                                         if re.match(rf"{component}/binary-{architecture}/Packages", filename):
                                             indexFiles.append(f"{baseUrl}{filename}")
-                                            self._indexCollection.Add(component, architecture, f"{baseUrl}{filename}")
+
+                                            if re.match(rf"{component}/binary-{architecture}/Packages[^./]*(\.gz|\.bz2|\.xz|$)$", filename):
+                                                self._indexCollection.Add(component, architecture, f"{baseUrl}{filename}")
                                             if Settings.ByHash():
                                                 indexFiles.append(binaryByHash)
 
@@ -549,6 +551,6 @@ class LogFilter(object):
         """Initialise the filter level."""
         self.__level = level
 
-    def Filter(self, logRecord):
+    def filter(self, logRecord):
         """Return whether the Record is covered by a filter or not."""
         return logRecord.levelno >= self.__level

@@ -3,20 +3,21 @@
 import sys
 import logging
 from logging.handlers import RotatingFileHandler
-import click
 import os
 import time
 from pathlib import Path
 import multiprocessing
 import math
 import shutil
-import tqdm
 import datetime
-import pkg_resources
 import gzip
 import lzma
 import bz2
 import site
+import pkg_resources
+
+import click
+import tqdm
 from filelock import FileLock
 
 from refrapt.classes import (
@@ -120,15 +121,29 @@ def main(conf: str, test: bool):
             pass
         logger.info(f"Processing {len(sources)} sources...")
 
-        # 1. Get the Index files for each of the sources
+        # 1. Get the Release files for each of the sources
+        releaseFiles = []
+        for source in sources:
+            releaseFiles += source.GetReleaseFiles()
+
+        logger.debug("Adding Release Files to filesToKeep:")
+        for releaseFile in releaseFiles:
+            logger.debug(f"\t{SanitiseUri(releaseFile)}")
+            filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
+
+        print()
+        logger.info(f"Compiled a list of {len(releaseFiles)} Release files for download")
+        Downloader.Download(releaseFiles, UrlType.Release)
+
+        # 2. Parse the Release files for the list of Index files to download
         indexFiles = []
         for source in sources:
-            indexFiles += source.GetIndexes()
+            indexFiles += source.ParseReleaseFiles()
 
         logger.debug("Adding Index Files to filesToKeep:")
-        for index in indexFiles:
-            logger.debug(f"\t{SanitiseUri(index)}")
-            filesToKeep.append(os.path.normpath(SanitiseUri(index)))
+        for indexFile in indexFiles:
+            logger.debug(f"\t{SanitiseUri(indexFile)}")
+            filesToKeep.append(os.path.normpath(SanitiseUri(indexFile)))
 
         print()
         logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
@@ -137,44 +152,16 @@ def main(conf: str, test: bool):
         for source in sources:
             source.Timestamp()
 
-        # 2. Get the Translation files for each of the Sources
-        translationFiles = []
-        for source in sources:
-            translationFiles += source.GetTranslationIndexes()
-
-        logger.debug("Adding Translation Files to filesToKeep:")
-        for translationFile in translationFiles:
-            logger.debug(f"\t{SanitiseUri(translationFile)}")
-            filesToKeep.append(os.path.normpath(SanitiseUri(translationFile)))
-
-        print()
-        logger.info(f"Compiled a list of {len(translationFiles)} Translation files for download")
-        Downloader.Download(translationFiles, UrlType.Translation)
-
-        # 3. Get the Dep11 files for each of the Sources
-        dep11Files = []
-        for source in sources:
-            dep11Files += source.GetDep11Files()
-
-        logger.debug("Adding dep11 Files to filesToKeep:")
-        for dep11File in dep11Files:
-            logger.debug(f"\t{SanitiseUri(dep11File)}")
-            filesToKeep.append(os.path.normpath(SanitiseUri(dep11File)))
-
-        print()
-        logger.info(f"Compiled a list of {len(dep11Files)} Dep11 files for download")
-        Downloader.Download(dep11Files, UrlType.Dep11)
-
-        # 4. Unzip each of the Packages / Sources indexes and obtain a list of all files to download
+        # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
         DecompressReleaseFiles()
 
         print()
         logger.info("Building file list...")
         for source in tqdm.tqdm([x for x in sources if x.Modified], position=0, unit=" source", desc="Sources "):
-            releaseFiles = source.GetReleaseFiles(True) # Only get modified files
+            releaseFiles = source.GetIndexFiles(True) # Only get modified files
 
             key = source.Uri
-            for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indexes ", leave=False):
+            for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indices ", leave=False):
                 value = file[len(SanitiseUri(key)):]
                 filesToDownload += ProcessIndex(key, value)
 
@@ -187,7 +174,7 @@ def main(conf: str, test: bool):
         for file in filesToKeep:
             logger.debug(f"\t{file}")
 
-        # 5. Perform the main download of Binary and Source files
+        # 4. Perform the main download of Binary and Source files
         downloadSize = CalculateDownloadSize([x[1] for x in filesToDownload])
         print()
         logger.info(f"Compiled a list of {len(filesToDownload)} Binary and Source files of size {downloadSize} for download")
@@ -196,7 +183,7 @@ def main(conf: str, test: bool):
         if not Settings.Test():
             Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive)
 
-        # 6. Copy Skel to Main Archive
+        # 5. Copy Skel to Main Archive
         if not Settings.Test():
             print()
             logger.info("Copying Skel to Mirror")
@@ -215,7 +202,7 @@ def main(conf: str, test: bool):
                         os.makedirs(Path(mirrorFile).parent.absolute(), exist_ok=True)
                         shutil.copyfile(skelFile, mirrorFile)
 
-        # 7. Remove any unused files
+        # 6. Remove any unused files
         print()
         Clean()
 
@@ -319,15 +306,15 @@ def Clean():
     for src in allUriSources:
         logger.debug(f"{src.Uri} [{src.Distribution}] {src.Components}")
 
-    # In order to not end up removing files that are listed in Indexes
+    # In order to not end up removing files that are listed in Indices
     # that were not processed in previous steps, we do need to read the
     # remainder of the Packages and Sources files in for the source in order
     # to build a full list of maintained files.
     for source in tqdm.tqdm(allUriSources, position=0, unit=" source", desc="Sources "):
-        releaseFiles = source.GetReleaseFiles(False) # Gets unmodified release files
+        releaseFiles = source.GetIndexFiles(False) # Gets unmodified release files
 
         key = source.Uri
-        for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indexes ", leave=False):
+        for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indices ", leave=False):
             value = file[len(SanitiseUri(key)):]
             ProcessUnmodifiedIndex(key, value)
 
@@ -354,12 +341,12 @@ def Clean():
         logger.debug(item)
 
     # Calculate size of items to clean
-    logger.info("Calculating space savings...")
-    clearSize = 0
-    for file in tqdm.tqdm(items, unit=" files"):
-        clearSize += os.path.getsize(file)
-
-    if clearSize == 0:
+    if items:
+        logger.info("Calculating space savings...")
+        clearSize = 0
+        for file in tqdm.tqdm(items, unit=" files"):
+            clearSize += os.path.getsize(file)
+    else:
         logger.info("No files eligible to clean")
         return
 
@@ -386,7 +373,7 @@ def DecompressReleaseFiles():
     """Decompresses the Release and Source files."""
     releaseFiles = []
     for source in sources:
-        releaseFiles += source.GetReleaseFiles(True) # Unmodified files only
+        releaseFiles += source.GetIndexFiles(True) # Modified files only
 
     print()
 
@@ -416,7 +403,7 @@ def UnzipFile(file: str):
             with open(file, "wb") as out:
                 shutil.copyfileobj(f, out)
     else:
-        logger.warn(f"File '{file}' has an unsupported compression format")
+        logger.warning(f"File '{file}' has an unsupported compression format")
 
 def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
     """Processes each package listed in the Index file.
@@ -555,23 +542,22 @@ def NeedUpdate(path: str, size: int) -> bool:
 
     if os.path.isfile(path):
         return os.path.getsize(path) != size
-    else:
-        return True
 
-def ConvertSize(bytes: int) -> str:
+    return True
+
+def ConvertSize(size: int) -> str:
     """Convert a number of bytes into a number with a suitable unit."""
-    if bytes == 0:
+    if size == 0:
         return "0B"
 
     sizeName = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-    i = int(math.floor(math.log(bytes, 1024)))
+    i = int(math.floor(math.log(size, 1024)))
     p = math.pow(1024, i)
-    s = round(bytes / p, 2)
+    s = round(size / p, 2)
     return "%s %s" % (s, sizeName[i])
 
 def GetSources(configData: list) -> list:
     """Determine the Sources listed in the Configuration file."""
-    sources = []
     for line in [x for x in configData if x.startswith("deb")]:
         sources.append(Source(line, Settings.Architecture()))
 

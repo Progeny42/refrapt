@@ -6,14 +6,15 @@ import os
 import multiprocessing
 import re
 from functools import partial
-import tqdm
-import filelock
 from dataclasses import dataclass
 import collections
 from pathlib import Path
 
 from refrapt.helpers import SanitiseUri
 from refrapt.settings import Settings
+import tqdm
+import filelock
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class UrlType(Enum):
     Translation = 1
     Dep11       = 2
     Archive     = 3
+    Release     = 4
 
 class IndexType(Enum):
     """Type of Index files."""
@@ -45,7 +47,6 @@ class Source:
         self._distribution = None
         self._components = [] # type: list[str]
         self._clean = True
-        self._flatRepository = False
 
         # Remove any inline comments
         if "#" in line:
@@ -81,7 +82,6 @@ class Source:
         else:
             self._distribution = ""
             self._components = []
-            self._flatRepository = True
 
         self._indexCollection = IndexCollection(self._components, self._architectures)
 
@@ -92,151 +92,50 @@ class Source:
         logger.debug(f"\tDistribution: {self._distribution}")
         logger.debug(f"\tComponents:   {self._components}")
         logger.debug(f"\tIndex Coll:   {self._indexCollection}")
-        logger.debug(f"\tFlat:         {self._flatRepository}")
+        logger.debug(f"\tFlat:         {not self._components}")
 
-    def GetIndexes(self) -> list:
-        """Get a list of all Indexes for the Source."""
+    def GetReleaseFiles(self) -> list:
+        """Get the Release files for the Source."""
 
         baseUrl = self._uri + "/"
-        if not self._flatRepository:
+        if self._components:
             baseUrl += "dists/" + self._distribution + "/"
 
-        indexes = []
-        compressionFormats = [".gz", ".bz2", ".xz"]
+        releaseFiles = []
 
-        indexes.append(baseUrl + "InRelease")
-        indexes.append(baseUrl + "Release")
-        indexes.append(baseUrl + "Release.gpg")
+        releaseFiles.append(baseUrl + "InRelease")
+        releaseFiles.append(baseUrl + "Release")
+        releaseFiles.append(baseUrl + "Release.gpg")
 
-        if not self._components:
-            for compressionFormat in compressionFormats:
-                indexes.append(self._uri + "/Sources" + compressionFormat)
-                indexes.append(self._uri + "/Packages" + compressionFormat)
+        return releaseFiles
 
-                for architecture in self._architectures:
-                    self._indexCollection.Add("Flat", architecture, self._uri + "/Sources" + compressionFormat)
-                    self._indexCollection.Add("Flat", architecture, self._uri + "/Packages" + compressionFormat)
+    def ParseReleaseFiles(self) -> list:
+        """Get a list of all Index files from the InRelease file (dists/$DIST/InRelease).
 
-        if self._sourceType == SourceType.Bin:
-            # Binary Files
-            if self._components:
-                if Settings.Contents():
-                    for architecture in self._architectures:
-                        for compressionFormat in compressionFormats:
-                            indexes.append(baseUrl + "Contents-" + architecture + compressionFormat)
-
-                for component in self._components:
-                    for architecture in self._architectures:
-                        if Settings.Contents():
-                            for compressionFormat in compressionFormats:
-                                indexes.append(f"{baseUrl}{component}/Contents-{architecture}{compressionFormat}")
-
-                        indexes.append(f"{baseUrl}{component}/binary-{architecture}/Release")
-                        indexes.append(f"{baseUrl}{component}/binary-{architecture}/Packages")
-
-                        for compressionFormat in compressionFormats:
-                            indexes.append(baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
-                            self._indexCollection.Add(component, architecture, baseUrl + component + "/binary-" + architecture + "/Packages" + compressionFormat)
-                            indexes.append(baseUrl + component + "/cnf/Commands-" + architecture + compressionFormat)
-                            indexes.append(baseUrl + component + "/i18n/cnf/Commands-" + architecture + compressionFormat)
-
-                    indexes.append(baseUrl + component + "/i18n/Index")
-        elif self._sourceType == SourceType.Src:
-            # Source Files
-            if self._components:
-                for component in self._components:
-                    indexes.append(baseUrl + component + "/source/Release")
-                    for compressionFormat in compressionFormats:
-                        indexes.append(baseUrl + component + "/source/Sources" + compressionFormat)
-                        self._indexCollection.Add(component, self._architectures[0], baseUrl + component + "/source/Sources" + compressionFormat)
-
-        self._indexCollection.DetermineCurrentTimestamps()
-
-        return indexes
-
-    def Timestamp(self):
-        """Get the timestamps for all registered index files after they have been downloaded."""
-        self._indexCollection.DetermineDownloadTimestamps()
-
-    def GetReleaseFiles(self, modified: bool) -> list:
-        """Get a list of all Release files for the Source."""
-
-        if modified:
-            return self._indexCollection.Files
-        else:
-            return self._indexCollection.UnmodifiedFiles
-
-    def GetTranslationIndexes(self) -> list:
-        """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
-        if self._sourceType != SourceType.Bin:
-            return []
-
-        translationIndexes = []
-
-        if self._flatRepository:
-            translationIndexes = self.__ProcessTranslationIndex(self._uri + "/", "")
-        else:
-            baseUrl = self._uri + "/dists/" + self._distribution + "/"
-
-            for component in self._components:
-                translationIndexes += self.__ProcessTranslationIndex(baseUrl, component)
-
-        return translationIndexes
-
-    def GetDep11Files(self) -> list:
-        """Get a list of all TranslationIndexes for the Source if it represents a deb mirror."""
-        if self._sourceType != SourceType.Bin:
-            return []
-
-        dep11Files = []
-
-        if self._flatRepository:
-            baseUrl = self._uri + "/"
-            releaseUri = baseUrl + "Release"
-            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-
-            dep11Files = self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl)
-        else:
-            baseUrl = self._uri + "/dists/" + self._distribution + "/"
-            releaseUri = baseUrl + "Release"
-            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-
-            for component in self._components:
-                dep11Files += self.__ProcessIndex(releasePath, IndexType.Dep11, baseUrl, "", component)
-
-        return dep11Files
-
-    def __ProcessTranslationIndex(self, url: str, component: str) -> list:
-        """Extract all Translation files from the /dists/$DIST/$COMPONENT/i18n/Index file.
-
-           Falls back to parsing /dists/$DIST/Release if /i18n/Index is not found.
+           If the InRelease file does not exist, fall back to the Release file (dists/$DIST/Release).
         """
 
-        if self._flatRepository:
-            releaseUri = url + "Release"
-            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-            return self.__ProcessIndex(releasePath, IndexType.Release, url)
+        baseUrl = self._uri + "/"
+        if self._components:
+            baseUrl += "dists/" + self._distribution + "/"
 
-        baseUri = url + component + "/i18n/"
-        indexUri = baseUri + "Index"
-        indexPath = Settings.SkelPath() + "/" + SanitiseUri(indexUri)
+        inReleaseFilePath = Settings.SkelPath() + "/" + SanitiseUri(baseUrl) + "/InRelease"
+        releaseFilePath   = Settings.SkelPath() + "/" + SanitiseUri(baseUrl) + "/Release"
 
-        if not os.path.isfile(indexPath):
-            releaseUri = url + "Release"
-            releasePath = Settings.SkelPath() + "/" + SanitiseUri(releaseUri)
-            return self.__ProcessIndex(releasePath, IndexType.Release, url, "", component)
+        # Default to InRelease
+        releaseFileToRead = inReleaseFilePath
 
-        return self.__ProcessIndex(indexPath, IndexType.Index, indexUri, baseUri, "")
+        if not os.path.isfile(inReleaseFilePath):
+            # Fall back to Release
+            releaseFileToRead = releaseFilePath
 
-    def __ProcessIndex(self, file: str, indexType: IndexType, indexUri: str, baseUri: str = "", component: str = "") -> list:
-        """Parses an Index file for all filenames."""
         checksums = False
 
-        indexes = []
+        indexFiles = []
 
-        with open(file) as f:
+        with open(releaseFileToRead) as f:
             for line in f:
-                if "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line:
+                if ("SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line) and "Hash:" not in line:
                     checksumType = line
                     checksumType = checksumType.replace(":", "").strip()
                     checksums = False
@@ -250,35 +149,95 @@ class Source:
                         # parts[2] = filename
 
                         if not len(parts) == 3:
-                            logger.warn(f"Malformed checksum line '{line}' in {indexUri}")
+                            logger.warning(f"Malformed checksum line '{line}' in {releaseFileToRead}")
                             continue
 
                         checksum = parts[0].strip()
                         filename = parts[2].rstrip()
 
-                        if indexType == IndexType.Release:
-                            if re.search(rf"{component}/i18n/Translation-{Settings.Language()}[^./]*(\.gz|\.bz2|\.xz|$)$", filename):
-                                indexes.append(indexUri + filename)
-                            if Settings.ByHash():
-                                indexes.append(f"{indexUri}{component}/i18n/by-hash/{checksumType}/{checksum}")
-                        elif indexType == IndexType.Dep11:
-                            for arch in self._architectures:
-                                if re.search(rf"{component}/dep11/(Components-{arch}\.yml|icons-[^./]+\.tar)\.(gz|bz2|xz)$", filename):
-                                    indexes.append(indexUri + filename)
-                            if Settings.ByHash():
-                                indexes.append(f"{indexUri}{component}/dep11/by-hash/{checksumType}/{checksum}")
-                        elif indexType == IndexType.Index:
-                            if "Translation-" in filename:
-                                if re.search(rf"Translation-{Settings.Language()}[^./]*(\.gz|\.bz2|\.xz|$)$", baseUri + filename):
-                                    indexes.append(baseUri + filename)
-                            else:
-                                indexes.append(baseUri + filename)
+                        if self._sourceType == SourceType.Bin:
+                            for architecture in self._architectures:
+                                if Settings.Contents():
+                                    if re.match(rf"Contents-{architecture}", filename):
+                                        indexFiles.append(f"{baseUrl}{filename}")
+
+                                if self._components:
+                                    for component in self._components:
+                                        if Settings.Contents():
+                                            if re.search(rf"{component}/Contents-{architecture}", filename):
+                                                indexFiles.append(f"{baseUrl}{filename}")
+
+                                        binaryByHash = rf"{baseUrl}{component}/binary-{architecture}/by-hash/{checksumType}/{checksum}"
+
+                                        if re.match(rf"{component}/binary-{architecture}/Release", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(binaryByHash)
+
+                                        if re.match(rf"{component}/binary-{architecture}/Packages", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            self._indexCollection.Add(component, architecture, f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(binaryByHash)
+
+                                        if re.match(rf"{component}/cnf/Commands-{architecture}", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(rf"{baseUrl}{component}/cnf/by-hash/{checksumType}/{checksum}")
+
+                                        i18nByHash = rf"{baseUrl}{component}/i18n/by-hash/{checksumType}/{checksum}"
+
+                                        if re.match(rf"{component}/i18n/cnf/Commands-{architecture}", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(i18nByHash)
+
+                                        if re.match(rf"{component}/i18n/Index", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(i18nByHash)
+
+                                        if re.match(rf"{component}/i18n/Translation-{Settings.Language()}", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(i18nByHash)
+
+                                        if re.match(rf"{component}/dep11/(Components-{architecture}\.yml|icons-[^./]+\.tar)", filename):
+                                            indexFiles.append(f"{baseUrl}{filename}")
+                                            if Settings.ByHash():
+                                                indexFiles.append(f"{baseUrl}{component}/dep11/by-hash/{checksumType}/{checksum}")
+                                else:
+                                    indexFiles.append(f"{baseUrl}{filename}")
+                                    self._indexCollection.Add("Flat", architecture, f"{baseUrl}{filename}")
+
+                        elif self._sourceType == SourceType.Src:
+                            for component in self._components:
+                                if re.match(rf"{component}/source/Release", filename):
+                                    indexFiles.append(f"{baseUrl}{filename}")
+
+                                if re.match(rf"{component}/source/Sources", filename):
+                                    indexFiles.append(f"{baseUrl}{filename}")
+                                    self._indexCollection.Add(component, self._architectures[0], f"{baseUrl}{filename}")
                     else:
                         checksums = False
                 else:
                     checksums = "SHA256:" in line or "SHA1:" in line or "MD5Sum:" in line
 
-        return list(set(indexes)) # Remove duplicates
+        self._indexCollection.DetermineCurrentTimestamps()
+
+        return list(set(indexFiles)) # Remove duplicates
+
+    def Timestamp(self):
+        """Get the timestamps for all registered files after they have been downloaded."""
+        self._indexCollection.DetermineDownloadTimestamps()
+
+    def GetIndexFiles(self, modified: bool) -> list:
+        """Get a list of all Packages / Sources files for the Source."""
+
+        if modified:
+            return self._indexCollection.Files
+        else:
+            return self._indexCollection.UnmodifiedFiles
 
     @property
     def SourceType(self) -> SourceType:
@@ -353,7 +312,7 @@ class Timestamp:
         return self._currentTimestamp != self._downloadedTimestamp
 
 class IndexCollection:
-    """A collection of all possible Index files for a Source."""
+    """A collection of all possible Packages / Sources files for a Source."""
 
     def __init__(self, components: list, architectures: list):
         """Initialises an Index Collection with a dictionary of each Component and Architecture."""
@@ -483,15 +442,15 @@ class Downloader:
     @staticmethod
     def DownloadUrlsProcess(url: str, kind: str, args: list, logPath: str, rateLimit: str):
         """Worker method for downloading a particular Url, used in multiprocessing."""
-        p = multiprocessing.current_process()
+        process = multiprocessing.current_process()
 
         baseCommand   = "wget --no-cache -N"
         rateLimit     = f"--limit-rate={rateLimit}"
         retries       = "-t 5"
         recursiveOpts = "-r -l inf"
-        logFile       = f"-a {logPath}/{kind}-log.{p._identity[0]}"
+        logFile       = f"-a {logPath}/{kind}-log.{process._identity[0]}"
 
-        filename = f"{logPath}/Download-lock.{p._identity[0]}"
+        filename = f"{logPath}/Download-lock.{process._identity[0]}"
 
         with filelock.FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:
@@ -539,11 +498,11 @@ class Index:
     def __init__(self, path: str):
         """Initialise an Index file with a path."""
         self._path = path
+        self._lines = [] # type: list[str]
 
     def Read(self):
         """Read and decode the contents of the file."""
         contents = []
-        self._lines = []
 
         with open(self._path, "rb") as f:
             contents = f.readlines()
@@ -590,6 +549,6 @@ class LogFilter(object):
         """Initialise the filter level."""
         self.__level = level
 
-    def filter(self, logRecord):
+    def Filter(self, logRecord):
         """Return whether the Record is covered by a filter or not."""
         return logRecord.levelno >= self.__level

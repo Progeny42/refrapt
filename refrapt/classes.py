@@ -467,7 +467,7 @@ class Downloader:
         """Creates custom Wget arguments based on the Settings provided."""
         arguments = []
 
-        if Settings.AuthNoChallege():
+        if Settings.AuthNoChallenge():
             arguments.append("--auth-no-challenge")
         if Settings.NoCheckCertificate():
             arguments.append("--no-check-certificate")

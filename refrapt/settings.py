@@ -1,45 +1,66 @@
+"""Contains the Settings singleton class."""
+
 import multiprocessing
 import logging
 from pathlib import Path
 import platform
 import locale
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 class Settings:
-    _settings = {
-        "architecture"      : platform.machine(),
-        "rootPath"          : f"{str(Path.home())}/refrapt",
-        "mirrorPath"        : f"{str(Path.home())}/refrapt/mirror",
-        "skelPath"          : f"{str(Path.home())}/refrapt/skel",
-        "varPath"           : f"{str(Path.home())}/refrapt/var",
-        "contents"          : True,
-        "threads"           : multiprocessing.cpu_count(),
-        "authNoChallenge"   : False,
-        "noCheckCertificate": False,
-        "unlink"            : False,
-        "useProxy"          : False,
-        "httpProxy"         : None,
-        "httpsProxy"        : None,
-        "proxyUser"         : None,
-        "proxyPass"         : None,
-        "certificate"       : None,
-        "caCertificate"     : None,
-        "privateKey"        : None,
-        "limitRate"         : "500m", # Wget syntax
-        "language"          : locale.getdefaultlocale()[0],
-        "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
-        "logLevel"          : "INFO",
-        "test"              : False,
-        "byHash"            : False,
-    }
+    """Settings singleton for the application."""
+
+    _settings = {} # type: dict[str, Any]
     _force = False
+
+    @staticmethod
+    def Init():
+        """Initialise default settings."""
+
+        Settings._settings = {
+            "architecture"      : platform.machine(),
+            "rootPath"          : f"{str(Path.home())}/refrapt",
+            "mirrorPath"        : f"{str(Path.home())}/refrapt/mirror",
+            "skelPath"          : f"{str(Path.home())}/refrapt/skel",
+            "varPath"           : f"{str(Path.home())}/refrapt/var",
+            "contents"          : True,
+            "threads"           : multiprocessing.cpu_count(),
+            "authNoChallenge"   : False,
+            "noCheckCertificate": False,
+            "unlink"            : False,
+            "useProxy"          : False,
+            "httpProxy"         : None,
+            "httpsProxy"        : None,
+            "proxyUser"         : None,
+            "proxyPass"         : None,
+            "certificate"       : None,
+            "caCertificate"     : None,
+            "privateKey"        : None,
+            "limitRate"         : "500m", # Wget syntax
+            "language"          : locale.getdefaultlocale()[0],
+            "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
+            "logLevel"          : logging.INFO,
+            "test"              : False,
+            "byHash"            : False,
+        }
+        Settings._force = False
+
+        # Shorten specific locales like en_GB to en to catch more files
+        if "_" in Settings.Language():
+            Settings._settings["language"] = Settings.Language().split("_")[0]
 
     @staticmethod
     def Parse(config: list):
         """Parse the configuration file and set the settings defined."""
+
+        if not config:
+            logger.warning("Configuration file is empty!")
+            return
+
         for line in config:
-            if line.startswith("set"):
+            if line.startswith("set ") and len(line.strip()) > 4:
                 key = line.split("set ")[1].split("=")[0].strip()
 
                 if key in Settings._settings:
@@ -50,11 +71,14 @@ class Settings:
                     elif "true" in value.lower() or "false" in value.lower():
                         Settings._settings[key] = value.lower() == "true"
                     else:
-                        Settings._settings[key] = value.strip().strip('"')
+                        if isinstance(Settings._settings[key], str):
+                            Settings._settings[key] = value.strip().strip('"')
+                        else:
+                            logger.warning(f"Setting '{key}' value ({value}) is the wrong type. Should be {type(Settings._settings[key])}")
 
                     logger.debug(f"Parsed setting: {key} = {Settings._settings.get(key)}")
                 else:
-                    logger.warning(f"Unknown setting in configuration file '{line}'")
+                    logger.warning(f"Unknown setting in configuration file: '{key}'")
 
         # Shorten specific locales like en_GB to en to catch more files
         if "_" in Settings.Language():
@@ -106,7 +130,7 @@ class Settings:
         return int(str(Settings._settings["threads"]))
 
     @staticmethod
-    def AuthNoChallege() -> bool:
+    def AuthNoChallenge() -> bool:
         """Get whether Wget should use the --auth-no-challenge parameter."""
         return bool(Settings._settings["authNoChallenge"])
 
@@ -126,39 +150,39 @@ class Settings:
         return bool(Settings._settings["useProxy"])
 
     @staticmethod
-    def HttpProxy() -> str:
+    def HttpProxy() -> Optional[str]:
         """Get the httpProxy setting."""
-        return str(Settings._settings["httpProxy"])
+        return Settings._settings["httpProxy"] # type: ignore
 
     @staticmethod
-    def HttpsProxy() -> str:
+    def HttpsProxy() -> Optional[str]:
         """Get the httpsProxy setting."""
-        return str(Settings._settings["httpsProxy"])
+        return Settings._settings["httpsProxy"] # type: ignore
 
     @staticmethod
-    def ProxyUser() -> str:
+    def ProxyUser() -> Optional[str]:
         """Get the proxyUser setting."""
-        return str(Settings._settings["proxyUser"])
+        return Settings._settings["proxyUser"] # type: ignore
 
     @staticmethod
-    def ProxyPassword() -> str:
+    def ProxyPassword() -> Optional[str]:
         """Get the proxyPass setting."""
-        return str(Settings._settings["proxyPass"])
+        return Settings._settings["proxyPass"] # type: ignore
 
     @staticmethod
-    def Certificate() -> str:
+    def Certificate() -> Optional[str]:
         """Get the certificate setting for SSL."""
-        return str(Settings._settings["certificate"])
+        return Settings._settings["certificate"] # type: ignore
 
     @staticmethod
-    def CaCertificate() -> str:
+    def CaCertificate() -> Optional[str]:
         """Get the ca certificate setting for SSL."""
-        return str(Settings._settings["caCertificate"])
+        return Settings._settings["caCertificate"] # type: ignore
 
     @staticmethod
-    def PrivateKey() -> str:
+    def PrivateKey() -> Optional[str]:
         """Get the private key setting for SSL."""
-        return str(Settings._settings["privateKey"])
+        return Settings._settings["privateKey"] # type: ignore
 
     @staticmethod
     def LimitRate() -> str:
@@ -178,7 +202,7 @@ class Settings:
     @staticmethod
     def LogLevel() -> int:
         """Get the log level used for application logger."""
-        return int(logging._nameToLevel[str(Settings._settings["logLevel"])])
+        return int(Settings._settings["logLevel"]) # type: ignore
 
     @staticmethod
     def ByHash() -> bool:

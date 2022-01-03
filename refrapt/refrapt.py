@@ -55,6 +55,7 @@ def main(conf: str, test: bool):
     configData = GetConfig(conf)
 
     # Parse the configuration file
+    Settings.Init()
     Settings.Parse(configData)
     logging.getLogger().setLevel(Settings.LogLevel())
 

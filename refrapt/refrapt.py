@@ -465,19 +465,19 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
 
                             md5 = sourceFile[0]
                             size = int(sourceFile[1])
-                            fileName = sourceFile[2]
+                            filename = sourceFile[2]
 
                             if filename.startswith("./"):
                                 filename = filename[2:]
 
-                            filesToKeep.append(os.path.normpath(f"{path}/{directory}/{fileName}"))
+                            filesToKeep.append(os.path.normpath(f"{path}/{directory}/{filename}"))
 
-                            allFile.write(f"{path}/{directory}/{fileName}\n")
-                            md5File.write(f"{md5} {path}/{directory}/{fileName}\n")
+                            allFile.write(f"{path}/{directory}/{filename}\n")
+                            md5File.write(f"{md5} {path}/{directory}/{filename}\n")
 
-                            if NeedUpdate(f"{mirror}/{directory}/{fileName}", size):
-                                newFile.write(f"{uri}/{directory}/{fileName}\n")
-                                packageDownloads.append((f"{uri}/{directory}/{fileName}", size))
+                            if NeedUpdate(f"{mirror}/{directory}/{filename}", size):
+                                newFile.write(f"{uri}/{directory}/{filename}\n")
+                                packageDownloads.append((f"{uri}/{directory}/{filename}", size))
 
     logger.debug("Packages to download:")
     for pkg, _ in packageDownloads:

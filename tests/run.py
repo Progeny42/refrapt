@@ -80,15 +80,19 @@ def PrintStats(testResult : TestResult):
         print(f"{Fore.YELLOW}Unexpected Successes: {len(testResult.unexpectedSuccesses)}")
         passCount -= len(testResult.unexpectedSuccesses)
 
+    totalTestsRun = testResult.testsRun - len(testResult.skipped)
+
     colour = Fore.GREEN
-    if passCount < testResult.testsRun and passCount > 0:
+    if passCount < totalTestsRun and passCount > 0:
         print()
         colour = Fore.YELLOW
     elif passCount == 0:
         print()
         colour = Fore.RED
+    elif testResult.skipped:
+        print()
 
-    print(f"{colour}Pass {passCount} / {testResult.testsRun}")
+    print(f"{colour}Pass {passCount} / {totalTestsRun}")
     print("-------------------------------------\n")
 
 if __name__ == '__main__':

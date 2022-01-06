@@ -118,5 +118,69 @@ class TestSettings(unittest.TestCase):
         Settings.Parse(testFile)
         self.test_DefaultSettings()
 
+    def test_ParseAllSettings(self):
+        """Pass a test file with all options set."""
+
+        testFile = """
+        set rootPath   = K:/Working/refrapt
+        set mirrorPath = D:/Working/refrapt/mirror
+        set skelPath   = D:/Working/refrapt/skel
+        set varPath    = K:/Working/refrapt/var
+
+        set architecture       = i386
+        set contents           = True
+        set threads            = 16
+        set authNoChallenge    = False
+        set noCheckCertificate = False
+        set unlink             = False
+        set useProxy           = False
+        set httpProxy          = ""
+        set httpsProxy         = ""
+        set proxyUser          = ""
+        set proxyPass          = ""
+        set certificate        = ""
+        set caCertificate      = ""
+        set privateKey         = ""
+        set limitRate          = 500m
+        set language           = en_GB
+        set forceUpdate        = False
+        set logLevel           = DEBUG
+        set test               = False
+        set byHash             = False
+        """
+        testFileLines =  [y for y in (x.strip() for x in testFile.splitlines()) if y]
+
+        Settings.Parse(testFileLines)
+
+        self.assertEqual(Settings.GetRootPath(), "K:/Working/refrapt")
+        self.assertEqual(Settings.MirrorPath(), "D:/Working/refrapt/mirror")
+        self.assertEqual(Settings.SkelPath(), "D:/Working/refrapt/skel")
+        self.assertEqual(Settings.VarPath(), "K:/Working/refrapt/var")
+
+        self.assertEqual(Settings.Architecture(), "i386")
+        self.assertTrue(Settings.Contents())
+        self.assertTrue(Settings.Threads(), multiprocessing.cpu_count())
+        self.assertFalse(Settings.AuthNoChallenge())
+        self.assertFalse(Settings.NoCheckCertificate())
+        self.assertFalse(Settings.Unlink())
+        self.assertFalse(Settings.UseProxy())
+        self.assertEqual(Settings.HttpProxy(), "")
+        self.assertEqual(Settings.HttpsProxy(), "")
+        self.assertEqual(Settings.ProxyUser(), "")
+        self.assertEqual(Settings.ProxyPassword(), "")
+        self.assertEqual(Settings.Certificate(), "")
+        self.assertEqual(Settings.CaCertificate(), "")
+        self.assertEqual(Settings.PrivateKey(), "")
+        self.assertEqual(Settings.LimitRate(), "500m")
+            # Match how the settings deals with the Locale
+        lang = locale.getdefaultlocale()[0]
+        if "_" in lang:
+            lang = lang.split("_")[0]
+        self.assertEqual(Settings.Language(), lang)
+        self.assertFalse(Settings.ForceUpdate())
+        self.assertEqual(Settings.LogLevel(), logging.DEBUG)
+        self.assertFalse(Settings.Test())
+        self.assertFalse(Settings.ByHash())
+
 if __name__ == '__main__':
     unittest.main()

@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class Settings:
     """Settings singleton for the application."""
 
-    _settings = {} # type: dict[str, Any]
+    _settings = { "rootPath"          : f"{str(Path.home())}/refrapt" } # type: dict[str, Any]
     _force = False
 
     @staticmethod
@@ -41,7 +41,7 @@ class Settings:
             "limitRate"         : "500m", # Wget syntax
             "language"          : locale.getdefaultlocale()[0],
             "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
-            "logLevel"          : logging.INFO,
+            "logLevel"          : "INFO",
             "test"              : False,
             "byHash"            : False,
         }
@@ -71,8 +71,11 @@ class Settings:
                     elif "true" in value.lower() or "false" in value.lower():
                         Settings._settings[key] = value.lower() == "true"
                     else:
-                        if isinstance(Settings._settings[key], str):
-                            Settings._settings[key] = value.strip().strip('"')
+                        if isinstance(Settings._settings[key], str) or Settings._settings[key] is None:
+                            if key == "logLevel" and not value.strip().strip('"') in logging._nameToLevel:
+                                logger.warning(f"logLevel setting value ({value}) is not a valid logging level.")
+                            else:
+                                Settings._settings[key] = value.strip().strip('"')
                         else:
                             logger.warning(f"Setting '{key}' value ({value}) is the wrong type. Should be {type(Settings._settings[key])}")
 
@@ -202,7 +205,7 @@ class Settings:
     @staticmethod
     def LogLevel() -> int:
         """Get the log level used for application logger."""
-        return int(Settings._settings["logLevel"]) # type: ignore
+        return int(logging._nameToLevel[str(Settings._settings["logLevel"])])
 
     @staticmethod
     def ByHash() -> bool:

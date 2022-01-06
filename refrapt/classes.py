@@ -41,7 +41,16 @@ class Source:
     """Represents a Source as defined the Configuration file."""
     def __init__(self, line, defaultArch):
         """Initialises a Source a line from the Configuration file and the default Architecture."""
-        self._sourceType = SourceType.Bin
+
+        if not line:
+            logger.fatal("Source line is empty!")
+            raise ValueError("Source line is empty")#
+
+        if not defaultArch:
+            logger.fatal("Source architecture is empty!")
+            raise ValueError("Source architecture is empty")
+
+        self._sourceType = None
         self._architectures = [] # type: list[str]
         self._uri = None
         self._distribution = None
@@ -53,23 +62,46 @@ class Source:
             line = line[0:line.index("#")]
 
         # Break down the line into its parts
-        elements = line.split(" ")
+        elements = re.split(r"\s+(?=[^\[\]]*(?:\[|$))", line)
         elements = list(filter(None, elements))
 
+        architectureSpecified = "[" in line and "]" in line
+
+        # Expect that a source at least defines the type (deb or deb-src) and the uri. Anything less is malformed
+        # Alternatively; type, architecture, uri
+        if len(elements) < 2 or (architectureSpecified and len(elements) < 3):
+            logger.fatal(f"Source line is malformed: '{line}'")
+            raise ValueError(f"Source line is malformed: '{line}'")
+
+        # Check for malformed Architecture line
+        if ("[" in line and "]" not in line) or ("[" not in line and "]" in line):
+            logger.fatal(f"Source line Architecture is malformed: '{line}'")
+            raise ValueError(f"Source line Architecture is malformed: '{line}'")
+
+        elementIndex = 0
+
         # Determine Source type
-        if elements[0] == "deb":
+        if elements[elementIndex] == "deb":
             self._sourceType = SourceType.Bin
-        elif 'deb-src' in elements[0]:
+        elif elements[elementIndex] == "deb-src":
             self._sourceType = SourceType.Src
 
-        elementIndex = 1
+        if not self._sourceType:
+            logger.fatal("Source line does not contain 'deb' or 'deb-src'")
+            raise ValueError("Source line does not contain 'deb' or 'deb-src'")
+
+        elementIndex += 1
 
         # If Architecture(s) is specified, store it, else set the default
-        if "[" in line and "]" in line:
+        if "[" in elements[elementIndex] and "]" in elements[elementIndex]:
             # Architecture is defined
-            archList = line.split("[")[1].split("]")[0].replace("arch=", "")
+            archList = elements[elementIndex].split("[")[1].split("]")[0].replace("arch=", "")
             self._architectures = archList.split(",")
             elementIndex += 1
+        elif architectureSpecified:
+            # Architecture found in wrong position
+            logger.fatal(f"Source line is malformed - Architecture should be second element: '{line}'")
+            raise ValueError(f"Source line is malformed - Architecture should be second element: '{line}'")
         else:
             self._architectures.append(defaultArch)
 
@@ -207,7 +239,7 @@ class Source:
                                         if re.match(rf"{component}/dep11/(Components-{architecture}\.yml|icons-[^./]+\.tar)", filename):
                                             indexFiles.append(f"{baseUrl}{filename}")
                                             if Settings.ByHash():
-                                                indexFiles.append(f"{baseUrl}{component}/dep11/by-hash/{checksumType}/{checksum}")
+                                                indexFiles.append(rf"{baseUrl}{component}/dep11/by-hash/{checksumType}/{checksum}")
                                 else:
                                     indexFiles.append(f"{baseUrl}{filename}")
                                     self._indexCollection.Add("Flat", architecture, f"{baseUrl}{filename}")

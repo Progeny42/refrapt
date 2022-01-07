@@ -87,8 +87,8 @@ class Source:
             self._sourceType = SourceType.Src
 
         if not self._sourceType:
-            logger.fatal("Source line does not contain 'deb' or 'deb-src'")
-            raise ValueError("Source line does not contain 'deb' or 'deb-src'")
+            logger.fatal("Source line does not start with 'deb' or 'deb-src'")
+            raise ValueError("Source line does not start with 'deb' or 'deb-src'")
 
         elementIndex += 1
 

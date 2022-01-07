@@ -12,6 +12,9 @@ from classes import (
     Source
 )
 
+_testDirectory = str(Path(__file__).parent.absolute())
+_fixturesDirectory = f"{_testDirectory}/fixtures"
+
 class TestSource_Init(unittest.TestCase):
     """Test case for the Source.Init method."""
 
@@ -274,9 +277,6 @@ class TestSource_GetReleaseFiles(unittest.TestCase):
 class TestSource_ParseReleaseFiles(unittest.TestCase):
     """Test case for the Source.ParseReleaseFiles method."""
 
-    _testDirectory = str(Path(__file__).parent.absolute())
-    _fixturesDirectory = f"{_testDirectory}/fixtures"
-
     _checksumTypes = ["SHA256", "SHA1", "MD5Sum"]
 
     def test_ParseReleaseFiles_Structured(self):
@@ -288,7 +288,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Structured",
+        f"set skelPath = {_fixturesDirectory}/Structured",
         "set contents  = False",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -346,7 +346,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Structured",
+        f"set skelPath = {_fixturesDirectory}/Structured",
         "set contents  = True",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -408,7 +408,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Structured",
+        f"set skelPath = {_fixturesDirectory}/Structured",
         "set contents  = False",
         "set byHash    = True",
         "set language  = 'en_GB'",
@@ -475,7 +475,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Flat",
+        f"set skelPath = {_fixturesDirectory}/Flat",
         "set contents  = False",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -516,7 +516,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Flat",
+        f"set skelPath = {_fixturesDirectory}/Flat",
         "set contents  = True",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -557,7 +557,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Flat",
+        f"set skelPath = {_fixturesDirectory}/Flat",
         "set contents  = False",
         "set byHash    = True",
         "set language  = 'en_GB'",
@@ -598,7 +598,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Structured",
+        f"set skelPath = {_fixturesDirectory}/Structured",
         "set contents  = False",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -643,7 +643,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Structured",
+        f"set skelPath = {_fixturesDirectory}/Structured",
         "set contents  = True",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -688,7 +688,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Structured",
+        f"set skelPath = {_fixturesDirectory}/Structured",
         "set contents  = False",
         "set byHash    = True",
         "set language  = 'en_GB'",
@@ -734,7 +734,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Flat",
+        f"set skelPath = {_fixturesDirectory}/Flat",
         "set contents  = False",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -776,7 +776,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Flat",
+        f"set skelPath = {_fixturesDirectory}/Flat",
         "set contents  = True",
         "set byHash    = False",
         "set language  = 'en_GB'",
@@ -818,7 +818,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         # Need to setup the Settings specifically for this test
         Settings.Init()
         dummyConfig = [
-        f"set skelPath = {self._fixturesDirectory}/ReleaseFiles/Flat",
+        f"set skelPath = {_fixturesDirectory}/Flat",
         "set contents  = False",
         "set byHash    = True",
         "set language  = 'en_GB'",
@@ -849,6 +849,261 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
                 found = found or re.match(regex, file.replace(baseUrl, ""))
 
             self.assertTrue(found)
+
+class TestSource_Timestamp(unittest.TestCase):
+    """Test case for the Source.Timestamp method."""
+
+    def test_Timestamp(self):
+        """Ensure that calling this with not files does not cause a crash."""
+
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        source = Source(line, "amd64")
+
+        source.Timestamp()
+
+class TestSource_GetIndexFiles(unittest.TestCase):
+    """Test case for the Source.GetIndexFiles method."""
+
+    def test_GetIndexFiles_EmptySource(self):
+        """Test that querying index files without parsing a Release file returns nothing in both cases."""
+
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        source = Source(line, "amd64")
+
+        self.assertTrue(len(source.GetIndexFiles(True)) == 0) # All modified files
+        self.assertTrue(len(source.GetIndexFiles(False)) == 0) # All unmodified files
+
+    def test_GetIndexFiles(self):
+        """Check the Index files returned are expected when Timestamp has not been called."""
+
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Structured",
+        "set contents  = False",
+        "set byHash    = False",
+        "set language  = 'en_GB'",
+        ]
+        Settings.Parse(dummyConfig)
+
+        # Setup a Structured repository to test against
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        source = Source(line, "amd64")
+
+        indexFiles = source.ParseReleaseFiles() # type: list[str]
+
+        # Ensure we actually got some files
+        self.assertTrue(len(indexFiles) > 0)
+
+        # Current Timestamp will not match the Download Timestamp and Timestamp has not been called
+        self.assertTrue(len(source.GetIndexFiles(True)) > 0)
+        # All unmodified files should be returned.
+        self.assertTrue(len(source.GetIndexFiles(False)) > 0)
+
+        # Ensure files exist within original indexFiles that were requested
+        for file in source.GetIndexFiles(True):
+            self.assertTrue(any(file in s for s in indexFiles))
+        for file in source.GetIndexFiles(False):
+            self.assertTrue(any(file in s for s in indexFiles))
+
+    def test_GetIndexFiles_Timestamped(self):
+        """Check the Index files returned are expected when Timestamp has been called."""
+
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Structured",
+        "set contents  = False",
+        "set byHash    = False",
+        "set language  = 'en_GB'",
+        ]
+        Settings.Parse(dummyConfig)
+
+        # Setup a Structured repository to test against
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        source = Source(line, "amd64")
+
+        indexFiles = source.ParseReleaseFiles() # type: list[str]
+
+        # Ensure we actually got some files
+        self.assertTrue(len(indexFiles) > 0)
+
+        # Timestamp the files
+        source.Timestamp()
+
+        # Files have been timestamped. The files already existed on disk, so were timestamped during Parse.
+        # The files after "download" (not performed here, already on disk), are equal - therefore Modified
+        # files is False
+        self.assertTrue(len(source.GetIndexFiles(True)) == 0)
+        # Therefore, all unmodified files should be returned.
+        self.assertTrue(len(source.GetIndexFiles(False)) > 0)
+
+        # Ensure files exist within original indexFiles that were requested
+        for file in source.GetIndexFiles(True):
+            self.assertTrue(any(file in s for s in indexFiles))
+        for file in source.GetIndexFiles(False):
+            self.assertTrue(any(file in s for s in indexFiles))
+
+class TestSource_Properties(unittest.TestCase):
+    """Test case for each of the Source class Properties."""
+
+    def test_SourceType_Binary(self):
+        """Test that a Binary source is correctly identified."""
+
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        source = Source(line, "amd64")
+
+        self.assertEqual(source.SourceType, SourceType.Bin)
+
+    def test_SourceType_Source(self):
+        """Test that a Source source is correctly identified."""
+
+        line = "deb-src [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        source = Source(line, "amd64")
+
+        self.assertEqual(source.SourceType, SourceType.Src)
+
+    def test_Uri(self):
+        """Test that a Uri is correctly identified."""
+
+        uris = [
+            "http://gb.archive.ubuntu.com/ubuntu",
+            "http://ftp.debian.org/debian",
+            "http://security.debian.org",
+            "http://archive.raspberrypi.org/debian",
+            "http://raspbian.raspberrypi.org/raspbian",
+            "https://repos.influxdata.com/debian",
+            "https://repos.influxdata.com/ubuntu",
+            "http://ppa.launchpad.net/ansible/ansible/ubuntu",
+            "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64"
+        ]
+
+        for uri in uris:
+            line = f"deb [arch=amd64] {uri} dist component1"
+            source = Source(line, "amd64")
+
+            self.assertEqual(source.Uri, uri)
+
+    def test_Distribution(self):
+        """Test that a Distribution is correctly identified."""
+        
+        distributions = [
+            "focal",
+            "focal-security",
+            "focal-updates",
+            "focal-proposed",
+            "focal-backports",
+            "buster",
+            "buster-updates",
+            "buster/updates",
+            ""
+        ]
+
+        for dist in distributions:
+            line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu {dist}"
+            if dist:
+                line += " component1"
+
+            source = Source(line, "amd64")
+            self.assertEqual(source.Distribution, dist)
+
+    def test_Components(self):
+        """Test that Components are correctly identified."""
+        
+        componentList = [
+            ["main", "restricted", "universe", "multiverse"],
+            ["main", "contrib", "non-free"],
+            ["main"],
+            ["stable"],
+            []
+        ]
+
+        for components in componentList:
+            line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu dist {' '.join(components)}"
+
+            source = Source(line, "amd64")
+            self.assertListEqual(source.Components, components)
+
+    def test_Architectures(self):
+        """Test that Architectures are correctly identified."""
+        
+        architectures = [
+            "Alpa",
+            "Arm",
+            "Armel",
+            "armhf",
+            "arm64",
+            "hppa",
+            "i386",
+            "amd64",
+            "ia64",
+            "m68k",
+            "mips",
+            "mipsel",
+            "mipsel",
+            "mips64el",
+            "PowerPC",
+            "PPC64",
+            "ppc64el",
+            "riscv64",
+            "s390",
+            "s390x",
+            "SH4",
+            "sparc64",
+            "x32",
+            "amd64,i386,armhf",
+            "amd64 , i386 , armhf",
+        ]
+
+        for arch in architectures:
+            line = f"deb [arch={arch}] http://gb.archive.ubuntu.com/ubuntu dist"
+
+            source = Source(line, "default")
+
+            if "," in arch:
+                self.assertListEqual(arch.split(","), source.Architectures)
+            else:
+                self.assertIn(arch, source.Architectures)
+
+    def test_Clean(self):
+        """Test that Clean Property is correctly read."""
+
+        line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu dist"
+
+        source = Source(line, "default")
+
+        # Clean is defuault behaviour
+        self.assertTrue(source.Clean)
+
+        source.Clean = False
+        self.assertFalse(source.Clean)
+
+    def test_Modified(self):
+        """Test that Modified is correctly identified."""
+
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Structured",
+        "set contents  = False",
+        "set byHash    = False",
+        "set language  = 'en_GB'",
+        ]
+        Settings.Parse(dummyConfig)
+
+        line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main"
+
+        source = Source(line, "default")
+
+        # No files added to Collection, so Source is unmodified
+        self.assertFalse(source.Modified)
+
+        # Parse files to set Current Timestamps of existing files
+        source.ParseReleaseFiles()
+        self.assertTrue(source.Modified) # Current Timestamp != 0 (default Download timestamp)
+
+        source.Timestamp()
+        self.assertFalse(source.Modified) # Current Timestamp == Modified Timestamp
 
 if __name__ == '__main__':
     unittest.main()

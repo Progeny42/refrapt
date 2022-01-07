@@ -21,30 +21,10 @@ def Suite():
 
     logging.disable(logging.NOTSET)
 
-    if testResult.wasSuccessful():
-        PrintStats(testResult)
-    else:
-        PrintStats(testResult)
+    print("-------------------------------------")
+    print("Refrapt Test Results")
+    print("-------------------------------------\n")
 
-        if testResult.errors:
-            print(f"{Fore.RED}Errors:")
-            print("-------------------------------------")
-            for case, error in testResult.errors:
-                print(f"{Fore.LIGHTBLUE_EX}{case.id()}")
-                print(f"{error}")
-
-        if testResult.failures:
-            print(f"{Fore.RED}Failures:")
-            print("-------------------------------------")
-            for case, failure in testResult.failures:
-                print(f"{Fore.LIGHTBLUE_EX}{case.id()}")
-                print(f"{failure}")
-
-        if testResult.unexpectedSuccesses:
-            print(f"{Fore.YELLOW}Unexpected Successes:")
-            print("-------------------------------------")
-            for case in testResult.unexpectedSuccesses:
-                print(f"{Fore.LIGHTBLUE_EX}{case.id()}")
 
     if testResult.skipped:
         print(f"{Style.DIM}Skipped:")
@@ -53,11 +33,36 @@ def Suite():
             print(f"{Fore.LIGHTBLUE_EX}{case.id()}{Fore.WHITE} - {reason}")
         print()
 
+    if testResult.errors:
+        print(f"{Fore.RED}Errors:")
+        print("-------------------------------------")
+        for case, error in testResult.errors:
+            print(f"{Fore.LIGHTBLUE_EX}{case.id()}")
+            print(f"{error}")
+
+    if testResult.failures:
+        print(f"{Fore.RED}Failures:")
+        print("-------------------------------------")
+        for case, failure in testResult.failures:
+            print(f"{Fore.LIGHTBLUE_EX}{case.id()}")
+            print(f"{failure}")
+
+    if testResult.unexpectedSuccesses:
+        print(f"{Fore.YELLOW}Unexpected Successes:")
+        print("-------------------------------------")
+        for case in testResult.unexpectedSuccesses:
+            print(f"{Fore.LIGHTBLUE_EX}{case.id()}")
+
+    PrintStats(testResult)
+
     sys.exit(testResult.wasSuccessful())
 
 def PrintStats(testResult : TestResult):
     """Prints stats about the test run."""
     print("-------------------------------------")
+    print("Statistics")
+    print("-------------------------------------\n")
+
     passCount = testResult.testsRun
 
     if testResult.skipped:

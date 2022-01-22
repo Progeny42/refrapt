@@ -57,3 +57,9 @@ Now, you could use `Wget --continue`, but it has problems. The `--continue` opti
 Further, you could use the `--no-if-modified-since` option, which causes `Wget` to request the size and timestamp of the file which does circumvent the corruption possibilites of `--continue`. However not all servers are obligated, or able to return the size of the content being downloaded, which would mean that if unsupported, `Wget` will download the entire file each time Refrapt is run, as the sizes will not match, even though the timestamps do. This could cause unnecessary redownloads of perfectly good files.
 
 To attain the best of both worlds, Refrapt uses lock files. Just before the call to `Wget` is made, a `Download-lock.*` file is created, with the Uri of the resource attempting to be downloaded. Once the `Wget` download is complete, the lock file is removed. In the event that Refrapt is interrupted, next time Refrapt is run, it will scan the `VarPath` for any `Download-lock.*` files. If any are found, this means the file on disk is only partial downloaded. Refrapt will then delete the local copy, to ensure that `Wget` will always get the file again.
+
+# Donate
+-------------
+If you found this software helpful, consider a small contribution. Thanks very much!
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=F9XAHN4UUCKFJ)

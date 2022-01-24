@@ -1,0 +1,7 @@
+Archive: stable-updates
+Origin: Debian
+Label: Debian
+Version: 11-updates
+Acquire-By-Hash: yes
+Component: main
+Architecture: source

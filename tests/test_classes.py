@@ -606,7 +606,7 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
         Settings.Parse(dummyConfig)
 
         # Setup a Structured repository to test against
-        line = "deb-src [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        line = "deb-src http://deb.debian.org/debian/ bullseye-updates main contrib non-free"
         source = Source(line, "amd64")
 
         baseUrl = source.Uri + "/dists/" + source.Distribution + "/"
@@ -618,13 +618,13 @@ class TestSource_ParseReleaseFiles(unittest.TestCase):
 
         # For the configuration settings in the tests, we can expect the following Regexes to apply:       
         #   rf"{component}/source/Release"
-        #   rf"{component}/source/Sources"
+        #   rf"{component}/source/Sources[^./]*(\.gz|\.bz2|\.xz|$)$"
         #
         # If none of the Regexes apply, then something is wrong
         regexes = []
         for component in source.Components:
             regexes.append(rf"{component}/source/Release")
-            regexes.append(rf"{component}/source/Sources")
+            regexes.append(rf"{component}/source/Sources[^./]*(\.gz|\.bz2|\.xz|$)$")
 
         # Check that all files downloaded match a Regex expression
         for file in indexFiles:

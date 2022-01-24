@@ -246,10 +246,10 @@ class Source:
 
                         elif self._sourceType == SourceType.Src:
                             for component in self._components:
-                                if re.match(rf"{component}/source/Release", filename):
+                                if re.match(rf"{component}/source/Release$", filename):
                                     indexFiles.append(f"{baseUrl}{filename}")
 
-                                if re.match(rf"{component}/source/Sources", filename):
+                                if re.match(rf"{component}/source/Sources[^./]*(\.gz|\.bz2|\.xz|$)$", filename):
                                     indexFiles.append(f"{baseUrl}{filename}")
                                     self._indexCollection.Add(component, self._architectures[0], f"{baseUrl}{filename}")
                     else:

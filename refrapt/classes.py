@@ -199,10 +199,11 @@ class Source:
                                             if Settings.ByHash():
                                                 indexFiles.append(i18nByHash)
 
-                                        if re.match(rf"{component}/i18n/Translation-{Settings.Language()}", filename):
-                                            indexFiles.append(f"{baseUrl}{filename}")
-                                            if Settings.ByHash():
-                                                indexFiles.append(i18nByHash)
+                                        for language in Settings.Language():
+                                            if re.match(rf"{component}/i18n/Translation-{language}", filename):
+                                                indexFiles.append(f"{baseUrl}{filename}")
+                                                if Settings.ByHash():
+                                                    indexFiles.append(i18nByHash)
 
                                         if re.match(rf"{component}/dep11/(Components-{architecture}\.yml|icons-[^./]+\.tar)", filename):
                                             indexFiles.append(f"{baseUrl}{filename}")

@@ -27,7 +27,7 @@ class Settings:
         "caCertificate"     : None,
         "privateKey"        : None,
         "limitRate"         : "500m", # Wget syntax
-        "language"          : locale.getdefaultlocale()[0],
+        "language"          : [ locale.getdefaultlocale()[0] ],
         "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
         "logLevel"          : "INFO",
         "test"              : False,
@@ -43,12 +43,16 @@ class Settings:
                 key = line.split("set ")[1].split("=")[0].strip()
 
                 if key in Settings._settings:
-                    value = line.split("=")[1].strip().split(" ")[0] # Allow for inline comments, but strip them here
+                    value = line.split("=")[1].strip().split("#", 1)[0] # Allow for inline comments, but strip them here
 
                     if value.isdigit():
                         Settings._settings[key] = int(value)
                     elif "true" in value.lower() or "false" in value.lower():
                         Settings._settings[key] = value.lower() == "true"
+                    elif isinstance(Settings._settings[key], list):
+                        if key == "language":
+                            # More than 1 Language may be specified
+                            Settings._settings[key] = value.replace(" ", "").strip('"').split(",")
                     else:
                         Settings._settings[key] = value.strip().strip('"')
 
@@ -56,9 +60,19 @@ class Settings:
                 else:
                     logger.warning(f"Unknown setting in configuration file '{line}'")
 
-        # Shorten specific locales like en_GB to en to catch more files
-        if "_" in Settings.Language():
-            Settings._settings["language"] = Settings.Language().split("_")[0]
+        Settings._StripToLanguage()
+
+    @staticmethod
+    def _StripToLanguage():
+        """Strip Region / Script codes from Language codes in order to capture more files."""
+
+        languages = Settings.Language()
+        for index, locale in enumerate(languages):
+            if "_" in locale:
+                Settings._settings["language"][index] = locale.split("_")[0]
+
+        # There may be duplicates if multiple entries used the same Language, so strip them out
+        Settings._settings["language"] = list(set(Settings._settings["language"]))
 
     @staticmethod
     def Test() -> bool:
@@ -166,9 +180,9 @@ class Settings:
         return str(Settings._settings["limitRate"])
 
     @staticmethod
-    def Language() -> str:
-        """Get the local languge setting."""
-        return str(Settings._settings["language"])
+    def Language() -> list[str]:
+        """Get the languge setting."""
+        return list(Settings._settings["language"])
 
     @staticmethod
     def ForceUpdate() -> bool:

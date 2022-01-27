@@ -1,4 +1,4 @@
-# **Refrapt**
+# **Refrapt** ![Release](https://img.shields.io/github/release-date/Progeny42/refrapt?label=Release%20Date) ![Status](https://img.shields.io/pypi/status/Refrapt?color=silver&label=Status) ![Issues](https://img.shields.io/github/issues/Progeny42/refrapt?label=Issues) ![Downloads](https://img.shields.io/pypi/dm/Refrapt?color=blue&label=PyPi%20Downloads) [![Donate](https://img.shields.io/badge/Donate-PayPal-yellow.svg)](https://www.paypal.com/donate/?hosted_button_id=F9XAHN4UUCKFJ)
 -------------
 
 ## What is Refrapt?

@@ -35,12 +35,14 @@ logger = logging.getLogger(__name__)
 
 sources = [] # type: list[Source]
 filesToKeep = list() # type : dict[str]
+appLockFile = "refrapt-lock"
 
 @click.command()
 @click.version_option(pkg_resources.require("refrapt")[0].version)
 @click.option("--conf", default=f"{Settings.GetRootPath()}/refrapt.conf", help="Path to configuration file.", type=click.STRING)
-@click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files.", type=click.BOOL)
-def main(conf: str, test: bool):
+@click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files, and do not perform any cleaning.", type=click.BOOL)
+@click.option("--clean", is_flag=True, default=False, help="Clean all mirrors of unrequired files.", type=click.BOOL)
+def main(conf: str, test: bool, clean: bool):
     """A tool to mirror Debian repositories for use as a local mirror."""
 
     global sources
@@ -58,14 +60,12 @@ def main(conf: str, test: bool):
     Settings.Parse(configData)
     logging.getLogger().setLevel(Settings.LogLevel())
 
-    appLockFile = "refrapt-lock"
-
     # Ensure that command line argument for Test overrides if it is set in the configuration file
     if test:
         Settings.EnableTest()
 
     if Settings.Test():
-        logger.info("## Running in Test mode. Main download will not occur! ##\n")
+        logger.info("## Running in Test mode ##\n")
 
     sources = GetSources(configData)
 
@@ -112,102 +112,16 @@ def main(conf: str, test: bool):
     for item in os.listdir(Settings.VarPath()):
         os.remove(f"{Settings.VarPath()}/{item}")
 
-    filesToDownload = list([tuple()]) # type: list[tuple[str, int]]
-    filesToDownload.clear()
-
     # Create a lock file for the Application
     with FileLock(f"{Settings.VarPath()}/{appLockFile}.lock"):
         with open(f"{Settings.VarPath()}/{appLockFile}", "w+") as f:
             pass
-        logger.info(f"Processing {len(sources)} sources...")
-
-        # 1. Get the Release files for each of the sources
-        releaseFiles = []
-        for source in sources:
-            releaseFiles += source.GetReleaseFiles()
-
-        logger.debug("Adding Release Files to filesToKeep:")
-        for releaseFile in releaseFiles:
-            logger.debug(f"\t{SanitiseUri(releaseFile)}")
-            filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
 
         print()
-        logger.info(f"Compiled a list of {len(releaseFiles)} Release files for download")
-        Downloader.Download(releaseFiles, UrlType.Release)
-
-        # 2. Parse the Release files for the list of Index files to download
-        indexFiles = []
-        for source in sources:
-            indexFiles += source.ParseReleaseFiles()
-
-        logger.debug("Adding Index Files to filesToKeep:")
-        for indexFile in indexFiles:
-            logger.debug(f"\t{SanitiseUri(indexFile)}")
-            filesToKeep.append(os.path.normpath(SanitiseUri(indexFile)))
-
-        print()
-        logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
-        Downloader.Download(indexFiles, UrlType.Index)
-
-        for source in sources:
-            source.Timestamp()
-
-        # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
-        DecompressReleaseFiles()
-
-        print()
-        logger.info("Building file list...")
-        for source in tqdm.tqdm([x for x in sources if x.Modified], position=0, unit=" source", desc="Sources "):
-            releaseFiles = source.GetIndexFiles(True) # Only get modified files
-
-            key = source.Uri
-            for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indices ", leave=False):
-                value = file[len(SanitiseUri(key)):]
-                filesToDownload += ProcessIndex(key, value)
-
-        # Packages potentially add duplicate downloads, slowing down the rest
-        # of the process. To counteract, remove duplicates now
-        filesToDownload = list(set(filesToDownload))
-        filesToKeep = list(set(filesToKeep))
-
-        logger.debug(f"Files to keep: {len(filesToKeep)}")
-        for file in filesToKeep:
-            logger.debug(f"\t{file}")
-
-        # 4. Perform the main download of Binary and Source files
-        downloadSize = CalculateDownloadSize([x[1] for x in filesToDownload])
-        print()
-        logger.info(f"Compiled a list of {len(filesToDownload)} Binary and Source files of size {downloadSize} for download")
-
-        os.chdir(Settings.MirrorPath())
-        if not Settings.Test():
-            Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive)
-
-        # 5. Copy Skel to Main Archive
-        if not Settings.Test():
-            print()
-            logger.info("Copying Skel to Mirror")
-            for indexUrl in tqdm.tqdm(filesToKeep, unit=" files"):
-                skelFile   = f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"
-                if os.path.isfile(skelFile):
-                    mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
-                    copy = True
-                    if os.path.isfile(mirrorFile):
-                        # Compare files using Timestamp to save moving files that don't need to be
-                        skelTimestamp   = os.path.getmtime(Path(skelFile))
-                        mirrorTimestamp = os.path.getmtime(Path(mirrorFile))
-                        copy = skelTimestamp > mirrorTimestamp
-
-                    if copy:
-                        os.makedirs(Path(mirrorFile).parent.absolute(), exist_ok=True)
-                        shutil.copyfile(skelFile, mirrorFile)
-
-        # 6. Remove any unused files
-        print()
-        if Settings.CleanEnabled():
-            Clean()
+        if clean:
+            PerformClean()
         else:
-            logger.info("Skipping Clean")
+            PerformMirroring()
 
     # Lock file no longer required
     os.remove(f"{Settings.VarPath()}/{appLockFile}")
@@ -217,6 +131,178 @@ def main(conf: str, test: bool):
 
     print()
     logger.info(f"Refrapt completed in {datetime.timedelta(seconds=round(time.perf_counter() - startTime))}")
+
+def PerformClean():
+    """Perform the cleaning of files on the local repository."""
+    global sources
+    global filesToKeep
+
+    logger.info("## Clean Mode ##")
+    print()
+
+    # The Force setting needs to be enabled so that a Source will return all Index Files, 
+    # and not just modified ones. The dependency isn't great, but this feature is an add-on
+    # and not part of the initial design
+    Settings.SetForce()
+
+    cleanSources = []
+
+    # 1. Ensure that the sources are actually on disk
+    for source in sources:
+        if os.path.isdir(f"{Settings.MirrorPath()}/{SanitiseUri(source.Uri)}/dists/{source.Distribution}"):
+            cleanSources.append(source)
+        else:
+            logger.debug(f"Source not found on disk: {SanitiseUri(source.Uri)} {source.Distribution}")
+
+    # 2. Get the Release files for each of the sources
+    releaseFiles = []
+    for source in cleanSources:
+        releaseFiles += source.GetReleaseFiles()
+
+    for releaseFile in releaseFiles:
+        filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
+
+    # 3. Parse the Release files for the list of Index files that are on Disk
+    indexFiles = []
+    for source in cleanSources:
+        indexFiles += source.ParseReleaseFilesOnDisk()
+
+    for indexFile in indexFiles:
+        filesToKeep.append(os.path.normpath(SanitiseUri(indexFile)))
+
+    # 4. Generate list of all files on disk according to the Index files
+    logger.info("Reading all packages...")
+    for source in tqdm.tqdm(cleanSources, position=0, unit=" source", desc="Sources "):
+        releaseFiles = source.GetIndexFiles(True)
+
+        key = source.Uri
+        for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indices ", leave=False):
+            value = file[len(SanitiseUri(key)):]
+            ProcessUnmodifiedIndex(key, value, Settings.MirrorPath())
+
+    os.chdir(Settings.MirrorPath())
+
+    # Packages potentially add duplicates - remove duplicates now
+    requiredFiles = [] # type: list[str]
+    requiredFiles = list(set(filesToKeep))
+
+    Clean(cleanSources, requiredFiles)
+
+def PerformMirroring():
+    """Perform the main mirroring function of this application."""
+
+    global sources
+    global filesToKeep
+
+    filesToDownload = list([tuple()]) # type: list[tuple[str, int]]
+    filesToDownload.clear()
+
+    logger.info(f"Processing {len(sources)} sources...")
+
+    # 1. Get the Release files for each of the sources
+    releaseFiles = []
+    for source in sources:
+        releaseFiles += source.GetReleaseFiles()
+
+    logger.debug("Adding Release Files to filesToKeep:")
+    for releaseFile in releaseFiles:
+        logger.debug(f"\t{SanitiseUri(releaseFile)}")
+        filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
+
+    print()
+    logger.info(f"Compiled a list of {len(releaseFiles)} Release files for download")
+    Downloader.Download(releaseFiles, UrlType.Release)
+
+    # 2. Parse the Release files for the list of Index files to download
+    indexFiles = []
+    for source in sources:
+        indexFiles += source.ParseReleaseFiles()
+
+    logger.debug("Adding Index Files to filesToKeep:")
+    for indexFile in indexFiles:
+        logger.debug(f"\t{SanitiseUri(indexFile)}")
+        filesToKeep.append(os.path.normpath(SanitiseUri(indexFile)))
+
+    print()
+    logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
+    Downloader.Download(indexFiles, UrlType.Index)
+
+    for source in sources:
+        source.Timestamp()
+
+    # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
+    DecompressReleaseFiles()
+
+    print()
+    logger.info("Building file list...")
+    for source in tqdm.tqdm([x for x in sources if x.Modified], position=0, unit=" source", desc="Sources "):
+        packages = source.GetIndexFiles(True) # Only get modified files
+
+        key = source.Uri
+        for file in tqdm.tqdm(packages, position=1, unit=" index", desc="Indices ", leave=False):
+            value = file[len(SanitiseUri(key)):]
+            filesToDownload += ProcessIndex(key, value)
+
+    # Packages potentially add duplicate downloads, slowing down the rest
+    # of the process. To counteract, remove duplicates now
+    filesToDownload = list(set(filesToDownload))
+    filesToKeep = list(set(filesToKeep))
+
+    logger.debug(f"Files to keep: {len(filesToKeep)}")
+    for file in filesToKeep:
+        logger.debug(f"\t{file}")
+
+    # 4. Perform the main download of Binary and Source files
+    downloadSize = CalculateDownloadSize([x[1] for x in filesToDownload])
+    print()
+    logger.info(f"Compiled a list of {len(filesToDownload)} Binary and Source files of size {downloadSize} for download")
+
+    os.chdir(Settings.MirrorPath())
+    if not Settings.Test():
+        Downloader.Download([x[0] for x in filesToDownload], UrlType.Archive)
+
+    # 5. Copy Skel to Main Archive
+    print()
+    if not Settings.Test():
+        logger.info("Copying Skel to Mirror")
+        for indexUrl in tqdm.tqdm(filesToKeep, unit=" files"):
+            skelFile   = f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"
+            if os.path.isfile(skelFile):
+                mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
+                copy = True
+                if os.path.isfile(mirrorFile):
+                    # Compare files using Timestamp to save moving files that don't need to be
+                    skelTimestamp   = os.path.getmtime(Path(skelFile))
+                    mirrorTimestamp = os.path.getmtime(Path(mirrorFile))
+                    copy = skelTimestamp > mirrorTimestamp
+
+                if copy:
+                    os.makedirs(Path(mirrorFile).parent.absolute(), exist_ok=True)
+                    shutil.copyfile(skelFile, mirrorFile)
+    else:
+        # Remove Release Files and Index Files added to /skel to ensure normal processing
+        # next time the application is run
+        os.chdir(Settings.SkelPath())
+
+        logger.info("Removing Release and Index files from /skel")
+        for releaseFile in releaseFiles:
+            file = os.path.normpath(f"{Settings.SkelPath()}/{SanitiseUri(releaseFile)}")
+            if os.path.isfile(file):
+                os.remove(file)
+
+        for indexFile in indexFiles:
+            file = os.path.normpath(f"{Settings.SkelPath()}/{SanitiseUri(indexFile)}")
+            if os.path.isfile(file):
+                os.remove(file)
+
+        os.chdir(Settings.MirrorPath())
+
+    # 6. Remove any unused files
+    print()
+    if Settings.CleanEnabled():
+        PostMirrorClean()
+    else:
+        logger.info("Skipping Clean")
 
 def ConfigureLogger():
     """Configure the logger for the Application."""
@@ -276,7 +362,47 @@ def CreateConfig(conf: str):
 
     logger.info(f"Configuration file created for first use at '{conf}'. Add some sources and run again. Application exiting.")
 
-def Clean():
+def Clean(sources: list, requiredFiles: list):
+    # 5. Determine which files are in the mirror, but not listed in the Index files
+    print()
+    items = [] # type: list[str]
+    logger.info("Compiling list of files to clean...")
+    uris = {source.Uri for source in sources}
+    for uri in tqdm.tqdm(uris, position=0, unit=" mirror", desc="Mirrors"):
+        walked = [] # type: list[str]
+        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO    ", leave=False, delay=0.5):
+            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files  ", leave=False, delay=0.5):
+                walked.append(os.path.join(root, file))
+
+        logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
+        items += [x for x in walked if os.path.normpath(x) not in requiredFiles and not os.path.islink(x)]
+
+    logger.debug(f"Found {len(items)} which can be freed")
+    for item in items:
+        logger.debug(item)
+
+    # 6. Calculate size of items to clean
+    if items:
+        logger.info("Calculating space savings...")
+        clearSize = 0
+        for file in tqdm.tqdm(items, unit=" files"):
+            clearSize += os.path.getsize(file)
+    else:
+        logger.info("No files eligible to clean")
+        return
+
+    print()
+    if Settings.Test():
+        logger.info(f"Found {ConvertSize(clearSize)} in {len(items)} files and directories that could be freed.")
+        return
+
+    logger.info(f"{ConvertSize(clearSize)} in {len(items)} files and directories will be freed...")
+
+    # 7. Clean files
+    for item in items:
+        os.remove(item)
+
+def PostMirrorClean():
     """Clean any files or directories that are not used.
 
        Determination of whether a file or directory is used
@@ -319,50 +445,14 @@ def Clean():
         key = source.Uri
         for file in tqdm.tqdm(releaseFiles, position=1, unit=" index", desc="Indices ", leave=False):
             value = file[len(SanitiseUri(key)):]
-            ProcessUnmodifiedIndex(key, value)
+            ProcessUnmodifiedIndex(key, value, Settings.SkelPath())
 
     # Packages potentially add duplicate downloads, slowing down the rest
     # of the process. To counteract, remove duplicates now
     requiredFiles = [] # type: list[str]
     requiredFiles = list(set(filesToKeep))
 
-    print()
-    items = [] # type: list[str]
-    logger.info("Compiling list of files to clean...")
-    uris = {source.Uri for source in cleanSources}
-    for uri in tqdm.tqdm(uris, position=0, unit=" mirror", desc="Mirrors"):
-        walked = [] # type: list[str]
-        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO    ", leave=False, delay=0.5):
-            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files  ", leave=False, delay=0.5):
-                walked.append(os.path.join(root, file))
-
-        logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
-        items += [x for x in walked if os.path.normpath(x) not in requiredFiles and not os.path.islink(x)]
-
-    logger.debug(f"Found {len(items)} which can be freed")
-    for item in items:
-        logger.debug(item)
-
-    # Calculate size of items to clean
-    if items:
-        logger.info("Calculating space savings...")
-        clearSize = 0
-        for file in tqdm.tqdm(items, unit=" files"):
-            clearSize += os.path.getsize(file)
-    else:
-        logger.info("No files eligible to clean")
-        return
-
-    if Settings.Test():
-        print()
-        logger.info(f"Found {ConvertSize(clearSize)} in {len(items)} files and directories that could be freed.")
-        return
-
-    print()
-    logger.info(f"{ConvertSize(clearSize)} in {len(items)} files and directories will be freed...")
-
-    for item in items:
-        os.remove(item)
+    Clean(cleanSources, requiredFiles)
 
 def CalculateDownloadSize(files: list) -> str:
     """Calculates the total size of a given listing of files."""
@@ -488,7 +578,7 @@ def ProcessIndex(uri: str, index: str) -> list[tuple[str, int]]:
 
     return packageDownloads
 
-def ProcessUnmodifiedIndex(uri: str, index: str):
+def ProcessUnmodifiedIndex(uri: str, index: str, rootPath: str):
     """Processes each package listed in the Index file.
 
        For each Package that is found in the Index file,
@@ -498,9 +588,9 @@ def ProcessUnmodifiedIndex(uri: str, index: str):
     """
     path = SanitiseUri(uri)
 
-    indexFile = Index(f"{Settings.SkelPath()}/{path}/{index}")
+    indexFile = Index(f"{rootPath}/{path}/{index}")
     indexFile.Read()
-    logging.debug(f"Processing Index file: {Settings.SkelPath()}/{path}/{index}")
+    logging.debug(f"Processing Index file: {rootPath}/{path}/{index}")
 
     packages = indexFile.GetPackages()
 

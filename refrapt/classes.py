@@ -109,7 +109,7 @@ class Source:
 
         return releaseFiles
 
-    def ParseReleaseFiles(self) -> list:
+    def _ParseReleaseFiles(self, rootPath: str) -> list:
         """Get a list of all Index files from the InRelease file (dists/$DIST/InRelease).
 
            If the InRelease file does not exist, fall back to the Release file (dists/$DIST/Release).
@@ -119,8 +119,8 @@ class Source:
         if self._components:
             baseUrl += "dists/" + self._distribution + "/"
 
-        inReleaseFilePath = Settings.SkelPath() + "/" + SanitiseUri(baseUrl) + "/InRelease"
-        releaseFilePath   = Settings.SkelPath() + "/" + SanitiseUri(baseUrl) + "/Release"
+        inReleaseFilePath = rootPath + "/" + SanitiseUri(baseUrl) + "/InRelease"
+        releaseFilePath   = rootPath + "/" + SanitiseUri(baseUrl) + "/Release"
 
         # Default to InRelease
         releaseFileToRead = inReleaseFilePath
@@ -229,6 +229,12 @@ class Source:
         self._indexCollection.DetermineCurrentTimestamps()
 
         return list(set(indexFiles)) # Remove duplicates
+
+    def ParseReleaseFilesOnDisk(self) -> list:
+        return self._ParseReleaseFiles(Settings.MirrorPath())
+
+    def ParseReleaseFiles(self) -> list:
+        return self._ParseReleaseFiles(Settings.SkelPath())
 
     def Timestamp(self):
         """Get the timestamps for all registered files after they have been downloaded."""

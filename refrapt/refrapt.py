@@ -204,7 +204,10 @@ def main(conf: str, test: bool):
 
         # 6. Remove any unused files
         print()
-        Clean()
+        if Settings.CleanEnabled():
+            Clean()
+        else:
+            logger.info("Skipping Clean")
 
     # Lock file no longer required
     os.remove(f"{Settings.VarPath()}/{appLockFile}")

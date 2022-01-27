@@ -76,6 +76,8 @@ set logLevel           = INFO
 set test               = False
 # Specify whether Refrapt should download the /by-hash/* directories and contents for each available checksum.
 set byHash             = False
+# Specify whether to disable Cleaning for all mirrors in this configuration file.
+set disableClean       = False
 
 #################
 ## SOURCE LIST ##

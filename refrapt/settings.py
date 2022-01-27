@@ -32,6 +32,7 @@ class Settings:
         "logLevel"          : "INFO",
         "test"              : False,
         "byHash"            : False,
+        "disableClean"      : False
     }
     _force = False
 
@@ -208,3 +209,8 @@ class Settings:
     def Force() -> bool:
         """Get whether the application should force full processing in the event of an interrupted run."""
         return bool(Settings._force)
+
+    @staticmethod
+    def CleanEnabled() -> bool:
+        """Get whether cleaning has been globally enabled."""
+        return bool(Settings._settings["disableClean"]) == False

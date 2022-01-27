@@ -1,4 +1,4 @@
-# **Refrapt** ![Release](https://img.shields.io/github/release-date/Progeny42/refrapt?label=Release%20Date) ![Status](https://img.shields.io/pypi/status/Refrapt?color=silver&label=Status) ![Issues](https://img.shields.io/github/issues/Progeny42/refrapt?label=Issues) ![Downloads](https://img.shields.io/pypi/dm/Refrapt?label=PyPi%20Downloads&color=blue) [![Donate](https://img.shields.io/badge/Donate-PayPal-yellow.svg)](https://www.paypal.com/donate/?hosted_button_id=F9XAHN4UUCKFJ)
+# **Refrapt** ![Release](https://img.shields.io/github/release-date/Progeny42/refrapt?label=Release%20Date) ![Status](https://img.shields.io/pypi/status/Refrapt?color=silver&label=Status) ![Issues](https://img.shields.io/github/issues/Progeny42/refrapt?label=Issues) ![Downloads](https://img.shields.io/pypi/dm/Refrapt) [![Donate](https://img.shields.io/badge/Donate-PayPal-yellow.svg)](https://www.paypal.com/donate/?hosted_button_id=F9XAHN4UUCKFJ)
 -------------
 
 ## What is Refrapt?
@@ -40,6 +40,12 @@ refrapt --conf "/path/to/your/config/file/refrapt.conf"
 Edit the configuration file by adding each of the sources you wish to mirror. Examples are provided in the file.
 
 For help with commands, run `refrapt --help`.
+
+# Command Line Options
+-------------
+`--Test` - Runs the application as normal, but does not perform the main download of files to the local mirror, and does not clean any files identified as no longer being required. Use this option to determine how large a download is going to be, and / or how many old files can be removed.
+
+`--Clean` - Only perform cleaning of files no longer required. No downloads are performed. Can be used in conjunction with the `--Test` option to identify the size of files that can be cleaned, without actually removing them. Use this option if your sources are not set to clean during the mirror process, or cleaning is globally disabled with `disableClean` in the configuration file. In conjunction with the `disableClean` option in the configuration file, Refrapt could clean unecessary files on a schedule such as in a cronjob.
 
 # Feature Explanation
 -------------

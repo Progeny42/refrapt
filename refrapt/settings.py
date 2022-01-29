@@ -16,19 +16,6 @@ class Settings:
     _force = False
 
     @staticmethod
-    def _StripToLanguage():
-        """Strip Region / Script codes from Language codes in order to capture more files."""
-        
-        languages = Settings.Language()
-        for index, locale in enumerate(languages):
-            if "_" in locale:
-                Settings._settings["language"][index] = locale.split("_")[0]
-
-        # There may be duplicates if multiple Regions / Scripts for the same Language were selected
-        # Remove duplicates by casting to a Set, then back to List for usage
-        Settings._settings["language"] = list(set(Settings._settings["language"]))
-
-    @staticmethod
     def Init():
         """Initialise default settings."""
 
@@ -82,10 +69,6 @@ class Settings:
                         Settings._settings[key] = int(value)
                     elif "true" in value.lower() or "false" in value.lower():
                         Settings._settings[key] = value.lower() == "true"
-                    elif isinstance(Settings._settings[key], list):
-                        if key == "language":
-                            # More than 1 Language may be specified
-                            Settings._settings[key] = value.replace(" ", "").strip('"').split(",")
                     else:
                         if isinstance(Settings._settings[key], str) or isinstance(Settings._settings[key], list) or Settings._settings[key] is None:
                             if key == "logLevel" and not value.strip().strip('"') in logging._nameToLevel:
@@ -103,17 +86,18 @@ class Settings:
                     logger.warning(f"Unknown setting in configuration file: '{key}'")
 
         Settings._StripToLanguage()
-
+    
     @staticmethod
     def _StripToLanguage():
         """Strip Region / Script codes from Language codes in order to capture more files."""
-
+        
         languages = Settings.Language()
         for index, locale in enumerate(languages):
             if "_" in locale:
                 Settings._settings["language"][index] = locale.split("_")[0]
 
-        # There may be duplicates if multiple entries used the same Language, so strip them out
+        # There may be duplicates if multiple Regions / Scripts for the same Language were selected
+        # Remove duplicates by casting to a Set, then back to List for usage
         Settings._settings["language"] = list(set(Settings._settings["language"]))
 
     @staticmethod

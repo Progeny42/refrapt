@@ -9,7 +9,7 @@
 # Each of the settings here are based on the default settings in Refrapt. If the values are
 # not specified in this file, the default in Refrapt will be used instead.
 
-# This is the default Architecture to be used if one is not specified in for a source.
+# This is the default Architecture to be used if one is not specified in for a Repository.
 set architecture       = i386
 
 # For each of the path variables, if not specified, will be found in ~/refrapt
@@ -79,10 +79,10 @@ set byHash             = False
 # Specify whether to disable Cleaning for all mirrors in this configuration file.
 set disableClean       = False
 
-#################
-## SOURCE LIST ##
-#################
-# Define each of the sources which you wish to mirror.
+#####################
+## REPOSITORY LIST ##
+#####################
+# Define each of the Repositories which you wish to mirror.
 # Multiple architectures can be specified per mirror, as well as multiple components
 
 # Simple multi-component mirror

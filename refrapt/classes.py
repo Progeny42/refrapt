@@ -11,10 +11,10 @@ import collections
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-from refrapt.helpers import SanitiseUri
-from refrapt.settings import Settings
 import multiprocessing
 
+from refrapt.helpers import SanitiseUri, UnzipFile
+from refrapt.settings import Settings
 import tqdm
 import filelock
 

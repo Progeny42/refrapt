@@ -43,9 +43,9 @@ For help with commands, run `refrapt --help`.
 
 # Command Line Options
 -------------
-`--Test` - Runs the application as normal, but does not perform the main download of files to the local mirror, and does not clean any files identified as no longer being required. Use this option to determine how large a download is going to be, and / or how many old files can be removed.
+`--test` - Runs the application as normal, but does not perform the main download of files to the local mirror, and does not clean any files identified as no longer being required. Use this option to determine how large a download is going to be, and / or how many old files can be removed.
 
-`--Clean` - Only perform cleaning of files no longer required. No downloads are performed. Can be used in conjunction with the `--Test` option to identify the size of files that can be cleaned, without actually removing them. Use this option if your Repositories are not set to clean during the mirror process, or cleaning is globally disabled with `disableClean` in the configuration file. In conjunction with the `disableClean` option in the configuration file, Refrapt could clean unecessary files on a schedule such as in a cronjob.
+`--clean` - Only perform cleaning of files no longer required. No downloads are performed. Can be used in conjunction with the `--test` option to identify the size of files that can be cleaned, without actually removing them. Use this option if your Repositories are not set to clean during the mirror process, or cleaning is globally disabled with `disableClean` in the configuration file. In conjunction with the `disableClean` option in the configuration file, Refrapt could clean unecessary files on a schedule such as in a cronjob.
 
 # Feature Explanation
 -------------

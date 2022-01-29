@@ -5,13 +5,20 @@ import sys
 from pathlib import Path
 import logging
 
+import coverage
 import colorama
 from colorama import Fore, Style
 
 def Suite():
     """Loads each of the test files in the test directory, runs them, and then prints the results."""
+    
     testLoader = TestLoader()
     testResult = TestResult()
+
+    sourceDirectory = str(Path(__file__).parent.parent.absolute()) + "/refrapt/"
+
+    cov = coverage.Coverage(branch=True, source=[sourceDirectory])
+    cov.start()
 
     logging.disable(logging.CRITICAL)
 
@@ -20,6 +27,10 @@ def Suite():
     testSuite.run(result=testResult)
 
     logging.disable(logging.NOTSET)
+
+    cov.stop()
+    cov.save()
+    cov.html_report()
 
     print("-------------------------------------")
     print("Refrapt Test Results")

@@ -1,4 +1,4 @@
-# **Refrapt**
+# **Refrapt** ![Release](https://img.shields.io/github/release-date/Progeny42/refrapt?label=Release%20Date) ![Status](https://img.shields.io/pypi/status/Refrapt?color=silver&label=Status) ![Issues](https://img.shields.io/github/issues/Progeny42/refrapt?label=Issues) ![Downloads](https://img.shields.io/pypi/dm/Refrapt) [![Donate](https://img.shields.io/badge/Donate-PayPal-yellow.svg)](https://www.paypal.com/donate/?hosted_button_id=F9XAHN4UUCKFJ)
 -------------
 
 ## What is Refrapt?
@@ -37,9 +37,15 @@ The first time Refrapt is run, a default configuration file will be installed at
 refrapt --conf "/path/to/your/config/file/refrapt.conf"
 ```
 
-Edit the configuration file by adding each of the sources you wish to mirror. Examples are provided in the file.
+Edit the configuration file by adding each of the Repositories you wish to mirror. Examples are provided in the file.
 
 For help with commands, run `refrapt --help`.
+
+# Command Line Options
+-------------
+`--test` - Runs the application as normal, but does not perform the main download of files to the local mirror, and does not clean any files identified as no longer being required. Use this option to determine how large a download is going to be, and / or how many old files can be removed.
+
+`--clean` - Only perform cleaning of files no longer required. No downloads are performed. Can be used in conjunction with the `--test` option to identify the size of files that can be cleaned, without actually removing them. Use this option if your Repositories are not set to clean during the mirror process, or cleaning is globally disabled with `disableClean` in the configuration file. In conjunction with the `disableClean` option in the configuration file, Refrapt could clean unecessary files on a schedule such as in a cronjob.
 
 # Feature Explanation
 -------------
@@ -57,3 +63,9 @@ Now, you could use `Wget --continue`, but it has problems. The `--continue` opti
 Further, you could use the `--no-if-modified-since` option, which causes `Wget` to request the size and timestamp of the file which does circumvent the corruption possibilites of `--continue`. However not all servers are obligated, or able to return the size of the content being downloaded, which would mean that if unsupported, `Wget` will download the entire file each time Refrapt is run, as the sizes will not match, even though the timestamps do. This could cause unnecessary redownloads of perfectly good files.
 
 To attain the best of both worlds, Refrapt uses lock files. Just before the call to `Wget` is made, a `Download-lock.*` file is created, with the Uri of the resource attempting to be downloaded. Once the `Wget` download is complete, the lock file is removed. In the event that Refrapt is interrupted, next time Refrapt is run, it will scan the `VarPath` for any `Download-lock.*` files. If any are found, this means the file on disk is only partial downloaded. Refrapt will then delete the local copy, to ensure that `Wget` will always get the file again.
+
+# Donate
+-------------
+If you found this software helpful, consider a small contribution. Thanks very much!
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=F9XAHN4UUCKFJ)

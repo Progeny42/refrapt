@@ -62,6 +62,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(Settings.LogLevel(), logging.INFO)
         self.assertFalse(Settings.Test())
         self.assertFalse(Settings.ByHash())
+        self.assertTrue(Settings.CleanEnabled())
 
     def test_EnableTestMode(self):
         """Tests that enabling Test mode correctly sets the option in Settings."""
@@ -147,6 +148,7 @@ class TestSettings(unittest.TestCase):
         set logLevel           = DEBUG
         set test               = False
         set byHash             = False
+        set disableClean       = False
         """
         testFileLines =  [y for y in (x.strip() for x in testFile.splitlines()) if y]
 
@@ -181,6 +183,7 @@ class TestSettings(unittest.TestCase):
         self.assertEqual(Settings.LogLevel(), logging.DEBUG)
         self.assertFalse(Settings.Test())
         self.assertFalse(Settings.ByHash())
+        self.assertTrue(Settings.CleanEnabled())
 
     def test_MultiLanguage(self):
         """Pass a test file with multiple Language options."""

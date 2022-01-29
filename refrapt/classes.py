@@ -135,6 +135,9 @@ class Repository:
         releaseFiles.append(baseUrl + "Release")
         releaseFiles.append(baseUrl + "Release.gpg")
 
+        for file in releaseFiles:
+            file = os.path.normpath(file)
+
         return releaseFiles
 
     def _ParseReleaseFiles(self, rootPath: str) -> list:
@@ -276,6 +279,9 @@ class Repository:
             self._packageCollection.DetermineCurrentTimestamps()
         elif self._repositoryType == RepositoryType.Src:
             self._sourceCollection.DetermineCurrentTimestamps()
+
+        for file in indexFiles:
+            file = os.path.normpath(file)
 
         return list(set(indexFiles)) # Remove duplicates caused by reading multiple listings for each checksum type
 
@@ -419,7 +425,6 @@ class Repository:
 
                 if filename.startswith("./"):
                     filename = filename[2:]
-
                 
                 packageList.append(Package(os.path.normpath(f"{path}/{filename}"), int(package["Size"]), skipUpdateCheck or not self._NeedUpdate(os.path.normpath(f"{mirror}/{filename}"), int(package["Size"]))))
             else:

@@ -13,8 +13,8 @@ from abc import ABC, abstractmethod
 
 import multiprocessing
 
-from refrapt.helpers import SanitiseUri, UnzipFile
-from refrapt.settings import Settings
+from helpers import SanitiseUri, UnzipFile
+from settings import Settings
 import tqdm
 import filelock
 
@@ -54,19 +54,17 @@ class Package:
 class Repository:
     """Represents a Repository as defined the Configuration file."""
     def __init__(self, line, defaultArch):
-        """Initialises a Source a line from the Configuration file and the default Architecture."""
+        """Initialises a Repository with a line from the Configuration file and the default Architecture."""
 
         if not line:
-            logger.fatal("Source line is empty!")
-            raise ValueError("Source line is empty")#
+            logger.fatal("Repository line is empty!")
+            raise ValueError("Repository line is empty")#
 
         if not defaultArch:
-            logger.fatal("Source architecture is empty!")
-            raise ValueError("Source architecture is empty")
+            logger.fatal("Repository architecture is empty!")
+            raise ValueError("Repository architecture is empty")
 
-        self._sourceType = None
-        """Initialises a Repository with a line from the Configuration file and the default Architecture."""
-        self._repositoryType = RepositoryType.Bin
+        self._repositoryType = None
         self._architectures = [] # type: list[str]
         self._uri = None
         self._distribution = None
@@ -83,28 +81,28 @@ class Repository:
 
         architectureSpecified = "[" in line and "]" in line
 
-        # Expect that a source at least defines the type (deb or deb-src) and the uri. Anything less is malformed
+        # Expect that a Repository at least defines the type (deb or deb-src) and the uri. Anything less is malformed
         # Alternatively; type, architecture, uri
         if len(elements) < 2 or (architectureSpecified and len(elements) < 3):
-            logger.fatal(f"Source line is malformed: '{line}'")
-            raise ValueError(f"Source line is malformed: '{line}'")
+            logger.fatal(f"Repository line is malformed: '{line}'")
+            raise ValueError(f"Repository line is malformed: '{line}'")
 
         # Check for malformed Architecture line
         if ("[" in line and "]" not in line) or ("[" not in line and "]" in line):
-            logger.fatal(f"Source line Architecture is malformed: '{line}'")
-            raise ValueError(f"Source line Architecture is malformed: '{line}'")
+            logger.fatal(f"Repository line Architecture is malformed: '{line}'")
+            raise ValueError(f"Repository line Architecture is malformed: '{line}'")
 
         elementIndex = 0
 
-        # Determine Source type
+        # Determine Repository type
         if elements[elementIndex] == "deb":
-            self._sourceType = RepositoryType.Bin
+            self._repositoryType = RepositoryType.Bin
         elif elements[elementIndex] == "deb-src":
-            self._sourceType = RepositoryType.Src
+            self._repositoryType = RepositoryType.Src
 
-        if not self._sourceType:
-            logger.fatal("Source line does not start with 'deb' or 'deb-src'")
-            raise ValueError("Source line does not start with 'deb' or 'deb-src'")
+        if not self._repositoryType:
+            logger.fatal("Repository line does not start with 'deb' or 'deb-src'")
+            raise ValueError("Repository line does not start with 'deb' or 'deb-src'")
 
         elementIndex += 1
 
@@ -116,8 +114,8 @@ class Repository:
             elementIndex += 1
         elif architectureSpecified:
             # Architecture found in wrong position
-            logger.fatal(f"Source line is malformed - Architecture should be second element: '{line}'")
-            raise ValueError(f"Source line is malformed - Architecture should be second element: '{line}'")
+            logger.fatal(f"Repository line is malformed - Architecture should be second element: '{line}'")
+            raise ValueError(f"Repository line is malformed - Architecture should be second element: '{line}'")
         else:
             self._architectures.append(defaultArch)
 
@@ -281,7 +279,7 @@ class Repository:
                                             indexFiles.append(f"{baseUrl}{filename}")
                                             if Settings.ByHash():
                                                 indexFiles.append(i18nByHash)
-
+                                       
                                         for language in Settings.Language():
                                             if re.match(rf"{component}/i18n/Translation-{language}", filename):
                                                 indexFiles.append(f"{baseUrl}{filename}")

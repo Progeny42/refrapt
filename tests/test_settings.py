@@ -57,7 +57,7 @@ class TestSettings(unittest.TestCase):
         lang = locale.getdefaultlocale()[0]
         if "_" in lang:
             lang = lang.split("_")[0]
-        self.assertEqual(Settings.Language(), lang)
+        self.assertEqual(Settings.Language(), [ lang ])
         self.assertFalse(Settings.ForceUpdate())
         self.assertEqual(Settings.LogLevel(), logging.INFO)
         self.assertFalse(Settings.Test())
@@ -176,11 +176,23 @@ class TestSettings(unittest.TestCase):
         lang = locale.getdefaultlocale()[0]
         if "_" in lang:
             lang = lang.split("_")[0]
-        self.assertEqual(Settings.Language(), lang)
+        self.assertEqual(Settings.Language(), [ lang ])
         self.assertFalse(Settings.ForceUpdate())
         self.assertEqual(Settings.LogLevel(), logging.DEBUG)
         self.assertFalse(Settings.Test())
         self.assertFalse(Settings.ByHash())
+
+    def test_MultiLanguage(self):
+        """Pass a test file with multiple Language options."""
+
+        testFile = """
+        set language = "en_GB, en_US, de_DE"
+        """
+        testFileLines =  [y for y in (x.strip() for x in testFile.splitlines()) if y]
+
+        Settings.Parse(testFileLines)
+
+        self.assertCountEqual(Settings.Language(), ["en", "de"])
 
 if __name__ == '__main__':
     unittest.main()

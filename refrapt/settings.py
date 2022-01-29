@@ -16,6 +16,19 @@ class Settings:
     _force = False
 
     @staticmethod
+    def _StripToLanguage():
+        """Strip Region / Script codes from Language codes in order to capture more files."""
+        
+        languages = Settings.Language()
+        for index, locale in enumerate(languages):
+            if "_" in locale:
+                Settings._settings["language"][index] = locale.split("_")[0]
+
+        # There may be duplicates if multiple Regions / Scripts for the same Language were selected
+        # Remove duplicates by casting to a Set, then back to List for usage
+        Settings._settings["language"] = list(set(Settings._settings["language"]))
+
+    @staticmethod
     def Init():
         """Initialise default settings."""
 
@@ -48,9 +61,7 @@ class Settings:
         }
         Settings._force = False
 
-        # Shorten specific locales like en_GB to en to catch more files
-        if "_" in Settings.Language():
-            Settings._settings["language"] = Settings.Language().split("_")[0]
+        Settings._StripToLanguage()
 
     @staticmethod
     def Parse(config: list):
@@ -76,9 +87,12 @@ class Settings:
                             # More than 1 Language may be specified
                             Settings._settings[key] = value.replace(" ", "").strip('"').split(",")
                     else:
-                        if isinstance(Settings._settings[key], str) or Settings._settings[key] is None:
+                        if isinstance(Settings._settings[key], str) or isinstance(Settings._settings[key], list) or Settings._settings[key] is None:
                             if key == "logLevel" and not value.strip().strip('"') in logging._nameToLevel:
                                 logger.warning(f"logLevel setting value ({value}) is not a valid logging level.")
+                            elif key == "language":
+                                # More than 1 Language may be supplied, so split into list
+                                Settings._settings[key] = value.replace(" ", "").strip('"').split(",")
                             else:
                                 Settings._settings[key] = value.strip().strip('"')
                         else:

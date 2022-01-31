@@ -7,6 +7,8 @@ import platform
 import locale
 from typing import Any, Optional
 
+import re
+
 logger = logging.getLogger(__name__)
 
 class Settings:
@@ -58,32 +60,37 @@ class Settings:
             logger.warning("Configuration file is empty!")
             return
 
+        optionRegex = r"^set (\w+) *= (([a-zA-Z0-9_:\/\\]+)(, \w+)*|(\"\w*\")) *(#.*)*$"
+
         for line in config:
-            if line.startswith("set ") and len(line.strip()) > 4:
-                key = line.split("set ")[1].split("=")[0].strip()
+            optionExpression = re.match(optionRegex, line)
+            if optionExpression:
+                name = optionExpression.group(1)
+                value = optionExpression.group(2)
 
-                if key in Settings._settings:
-                    value = line.split("=")[1].strip().split("#", 1)[0] # Allow for inline comments, but strip them here
-
+                if name in Settings._settings:
                     if value.isdigit():
-                        Settings._settings[key] = int(value)
+                        Settings._settings[name] = int(value)
                     elif "true" in value.lower() or "false" in value.lower():
-                        Settings._settings[key] = value.lower() == "true"
+                        Settings._settings[name] = value.lower() == "true"
                     else:
-                        if isinstance(Settings._settings[key], str) or isinstance(Settings._settings[key], list) or Settings._settings[key] is None:
-                            if key == "logLevel" and not value.strip().strip('"') in logging._nameToLevel:
-                                logger.warning(f"logLevel setting value ({value}) is not a valid logging level.")
-                            elif key == "language":
+                        if isinstance(Settings._settings[name], str) or isinstance(Settings._settings[name], list) or Settings._settings[name] is None:
+                            if name == "logLevel" and not value.strip().strip('"') in logging._nameToLevel:
+                                logger.warning(f"{name} setting value ({value}) is not a valid logging level.")
+                            elif name == "language":
                                 # More than 1 Language may be supplied, so split into list
-                                Settings._settings[key] = value.replace(" ", "").strip('"').split(",")
+                                Settings._settings[name] = value.replace(" ", "").strip('"').split(",")
                             else:
-                                Settings._settings[key] = value.strip().strip('"')
+                                Settings._settings[name] = value.strip().strip('"')
                         else:
-                            logger.warning(f"Setting '{key}' value ({value}) is the wrong type. Should be {type(Settings._settings[key])}")
+                            logger.warning(f"Setting '{name}' value ({value}) is the wrong type. Should be {type(Settings._settings[name])}")
 
-                    logger.debug(f"Parsed setting: {key} = {Settings._settings.get(key)}")
+                    logger.debug(f"Parsed setting: {name} = {Settings._settings.get(name)}")
+
                 else:
-                    logger.warning(f"Unknown setting in configuration file: '{key}'")
+                    logger.warning(f"Unknown setting in configuration file: '{name}'")
+            else:
+               logger.debug(f"Ignored line in configuration file: {line}")
 
         Settings._StripToLanguage()
     

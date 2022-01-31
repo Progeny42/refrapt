@@ -35,6 +35,11 @@ class UrlType(Enum):
 
 class Package:
     def __init__(self, filename: str, size: int, latest: bool):
+
+        assert filename, "Filename is None"
+        assert size > 0, "Size is not positive"
+        assert latest, "Latest is not a bool"
+
         self._Filename = filename
         self._Size = size
         self._Latest = latest
@@ -53,81 +58,52 @@ class Package:
 
 class Repository:
     """Represents a Repository as defined the Configuration file."""
-    def __init__(self, line, defaultArch):
+    def __init__(self, line: str, defaultArch: str):
         """Initialises a Repository with a line from the Configuration file and the default Architecture."""
 
-        if not line:
-            logger.fatal("Repository line is empty!")
-            raise ValueError("Repository line is empty")#
+        assert line, "Line is None"
+        assert defaultArch, "Architecture is None"
 
-        if not defaultArch:
-            logger.fatal("Repository architecture is empty!")
-            raise ValueError("Repository architecture is empty")
-
-        self._repositoryType = None
-        self._architectures = [] # type: list[str]
-        self._uri = None
-        self._distribution = None
+        self._repositoryType = None # type: RepositoryType
+        self._architectures = [ defaultArch ]
+        self._uri = None # type: str
+        self._distribution = None # type: str
         self._components = [] # type: list[str]
-        self._clean = True
+        self._clean = True # type: bool
 
-        # Remove any inline comments
-        if "#" in line:
-            line = line[0:line.index("#")]
+        repositoryRegex = r"^(deb(-src)*) ?(\[arch=\w+(, ?(\w+))*\])? (\S+)(\s*$| ([a-zA-Z0-9_\-\/]+) ((\w+)( [a-zA-Z0-9_\-]*)*)(\s?[#].*)?)$"
 
-        # Break down the line into its parts
-        elements = re.split(r"\s+(?=[^\[\]]*(?:\[|$))", line)
-        elements = list(filter(None, elements))
+        elements = re.search(repositoryRegex, line)
 
-        architectureSpecified = "[" in line and "]" in line
-
-        # Expect that a Repository at least defines the type (deb or deb-src) and the uri. Anything less is malformed
-        # Alternatively; type, architecture, uri
-        if len(elements) < 2 or (architectureSpecified and len(elements) < 3):
-            logger.fatal(f"Repository line is malformed: '{line}'")
+        if not elements:
             raise ValueError(f"Repository line is malformed: '{line}'")
 
-        # Check for malformed Architecture line
-        if ("[" in line and "]" not in line) or ("[" not in line and "]" in line):
-            logger.fatal(f"Repository line Architecture is malformed: '{line}'")
-            raise ValueError(f"Repository line Architecture is malformed: '{line}'")
-
-        elementIndex = 0
-
-        # Determine Repository type
-        if elements[elementIndex] == "deb":
+        # RepositoryType
+        repositoryType = elements.group(1)
+        if repositoryType == "deb":
             self._repositoryType = RepositoryType.Bin
-        elif elements[elementIndex] == "deb-src":
+        elif repositoryType == "deb-src":
             self._repositoryType = RepositoryType.Src
 
-        if not self._repositoryType:
-            logger.fatal("Repository line does not start with 'deb' or 'deb-src'")
-            raise ValueError("Repository line does not start with 'deb' or 'deb-src'")
+        # Architectures (optional)
+        architectures = elements.group(3)
+        if architectures:
+            architectures = architectures.replace("[arch=", "").replace(']', "")
 
-        elementIndex += 1
+            self._architectures = [x.strip() for x in architectures.split(',')]
 
-        # If Architecture(s) is specified, store it, else set the default
-        if "[" in elements[elementIndex] and "]" in elements[elementIndex]:
-            # Architecture is defined
-            archList = elements[elementIndex].split("[")[1].split("]")[0].replace("arch=", "")
-            self._architectures = archList.split(",")
-            elementIndex += 1
-        elif architectureSpecified:
-            # Architecture found in wrong position
-            logger.fatal(f"Repository line is malformed - Architecture should be second element: '{line}'")
-            raise ValueError(f"Repository line is malformed - Architecture should be second element: '{line}'")
-        else:
-            self._architectures.append(defaultArch)
+        # Uri
+        self._uri = elements.group(6)
 
-        self._uri           = elements[elementIndex]
+        # Distribution (optional)
+        distribution = elements.group(8)
+        if distribution:
+            self._distribution = distribution
 
-        # Handle flat repositories
-        if len(elements) > elementIndex + 1 and not elements[elementIndex + 1] == "/":
-            self._distribution = elements[elementIndex + 1]
-            self._components   = elements[elementIndex + 2:]
-        else:
-            self._distribution = ""
-            self._components = []
+        # Components (optional)
+        components = elements.group(9)
+        if components:
+            self._components = [x.strip() for x in components.split(" ")]          
 
         self._packageCollection = PackageCollection(self._components, self._architectures)
         self._sourceCollection  = SourceCollection(self._components)
@@ -171,6 +147,114 @@ class Repository:
             file = os.path.normpath(file)
 
         return releaseFiles
+
+    def ParseReleaseFilesFromLocalMirror(self) -> list:
+        """
+            Get a list of all Index files from the Release file 
+            using the files that exist in the /mirror directory.
+        """
+
+        return self._ParseReleaseFiles(Settings.MirrorPath())
+
+    def ParseReleaseFilesFromRemote(self) -> list:
+        """
+            Get a list of all Index files from the Release file 
+            using the files that exist in the /skel directory.
+        """
+
+        return self._ParseReleaseFiles(Settings.SkelPath())
+
+    def Timestamp(self):
+        """Record the timestamps for all 'Packages' or 'Sources' Indices."""
+        
+        if self._repositoryType == RepositoryType.Bin:
+            self._packageCollection.DetermineDownloadTimestamps()
+        elif self._repositoryType == RepositoryType.Src:
+            self._sourceCollection.DetermineDownloadTimestamps()
+
+    def DecompressIndexFiles(self):
+        """
+            Decompress the Binary Package Indices (Binary Repository) or 
+            Source Indices (Source Repository).
+        """
+
+        indexFiles = self._GetIndexFiles(True) # Modified files only
+
+        if not indexFiles:
+            return
+
+        indexType = None
+        if self._repositoryType == RepositoryType.Bin:
+            indexType = "Packages     "
+        elif self.RepositoryType == RepositoryType.Src:
+            indexType = "Sources      "
+
+        with multiprocessing.Pool(Settings.Threads()) as pool:
+            for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, indexFiles), position=1, total=len(indexFiles), unit=" index", desc=indexType, leave=False):
+                pass
+
+    def ParseIndexFiles(self) -> list[Package]:
+        """
+            Read the Binary Package Indices (Binary Repository) or 
+            Source Indices (Source Repository) for all Filenames.
+
+            Section 1.4 of the DebianRepository Format document states:
+            - "[The files] consist of multiple paragraphs ... and the additional 
+              fields defined in this section, precisely:
+                - Filename (mandatory)"
+            - https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices
+
+            Only the filename is of interest in order to download it.
+        """       
+
+        indices = self._GetIndexFiles(True) # Modified files only
+
+        fileList = [] # type: list[Package]
+
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+            fileList += self._ProcessIndex(Settings.SkelPath(), file, False)
+
+        return fileList
+
+    def ParseIndexFilesFromLocalMirror(self) -> list[Package]:
+        """Get all items listed in the Index files that exist within the /mirror directory."""
+
+        # The Force setting needs to be enabled so that a Repository will return all Index Files, 
+        # and not just modified ones. The dependency isn't great, but this feature is an add-on
+        # and not part of the initial design
+        Settings.SetForce()
+
+        indices = self._GetIndexFiles(True) # All files due to Force being Enabled
+
+        fileList = [] # type: list[str]
+
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+            fileList += self._ProcessIndex(Settings.MirrorPath(), file, True)
+        
+        return fileList
+
+    def ParseUnmodifiedIndexFiles(self) -> list[str]:
+        """
+            Read the Binary Package Indices (Binary Repository) or 
+            Source Indices (Source Repository) for all Filenames.
+
+            Section 1.4 of the DebianRepository Format document states:
+            - "[The files] consist of multiple paragraphs ... and the additional 
+              fields defined in this section, precisely:
+                - Filename (mandatory)"
+            - https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices
+
+            Only the filename is of interest in order to download it.
+        """       
+
+        indices = self._GetIndexFiles(False) # Unmodified files only
+
+        fileList = [] # type: list[Package]
+
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+            fileList += self._ProcessIndex(Settings.SkelPath(), file, True)
+
+        return [x for x in fileList if x.Latest]
 
     def _ParseReleaseFiles(self, rootPath: str) -> list:
         """
@@ -317,113 +401,6 @@ class Repository:
 
         return list(set(indexFiles)) # Remove duplicates caused by reading multiple listings for each checksum type
 
-    def ParseReleaseFilesFromLocalMirror(self) -> list:
-        """
-            Get a list of all Index files from the Release file 
-            using the files that exist in the /mirror directory.
-        """
-
-        return self._ParseReleaseFiles(Settings.MirrorPath())
-
-    def ParseReleaseFilesFromRemote(self) -> list:
-        """
-            Get a list of all Index files from the Release file 
-            using the files that exist in the /skel directory.
-        """
-
-        return self._ParseReleaseFiles(Settings.SkelPath())
-
-    def Timestamp(self):
-        """Record the timestamps for all 'Packages' or 'Sources' Indices."""
-        
-        if self._repositoryType == RepositoryType.Bin:
-            self._packageCollection.DetermineDownloadTimestamps()
-        elif self._repositoryType == RepositoryType.Src:
-            self._sourceCollection.DetermineDownloadTimestamps()
-
-    def DecompressIndexFiles(self):
-        """
-            Decompress the Binary Package Indices (Binary Repository) or 
-            Source Indices (Source Repository).
-        """
-
-        indexFiles = self._GetIndexFiles(True) # Modified files only
-
-        if not indexFiles:
-            return
-
-        indexType = None
-        if self._repositoryType == RepositoryType.Bin:
-            indexType = "Packages     "
-        elif self.RepositoryType == RepositoryType.Src:
-            indexType = "Sources      "
-
-        with multiprocessing.Pool(Settings.Threads()) as pool:
-            for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, indexFiles), position=1, total=len(indexFiles), unit=" index", desc=indexType, leave=False):
-                pass
-
-    def ParseIndexFiles(self) -> list[Package]:
-        """
-            Read the Binary Package Indices (Binary Repository) or 
-            Source Indices (Source Repository) for all Filenames.
-
-            Section 1.4 of the DebianRepository Format document states:
-            - "[The files] consist of multiple paragraphs ... and the additional 
-              fields defined in this section, precisely:
-                - Filename (mandatory)"
-            - https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices
-
-            Only the filename is of interest in order to download it.
-        """       
-
-        indices = self._GetIndexFiles(True) # Modified files only
-
-        fileList = [] # type: list[Package]
-
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
-            fileList += self._ProcessIndex(Settings.SkelPath(), file, False)
-
-        return fileList
-
-    def ParseIndexFilesFromLocalMirror(self) -> list[Package]:
-        """Get all items listed in the Index files that exist within the /mirror directory."""
-
-        # The Force setting needs to be enabled so that a Repository will return all Index Files, 
-        # and not just modified ones. The dependency isn't great, but this feature is an add-on
-        # and not part of the initial design
-        Settings.SetForce()
-
-        indices = self._GetIndexFiles(True) # All files due to Force being Enabled
-
-        fileList = [] # type: list[str]
-
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
-            fileList += self._ProcessIndex(Settings.MirrorPath(), file, True)
-        
-        return fileList
-
-    def ParseUnmodifiedIndexFiles(self) -> list[str]:
-        """
-            Read the Binary Package Indices (Binary Repository) or 
-            Source Indices (Source Repository) for all Filenames.
-
-            Section 1.4 of the DebianRepository Format document states:
-            - "[The files] consist of multiple paragraphs ... and the additional 
-              fields defined in this section, precisely:
-                - Filename (mandatory)"
-            - https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices
-
-            Only the filename is of interest in order to download it.
-        """       
-
-        indices = self._GetIndexFiles(False) # Unmodified files only
-
-        fileList = [] # type: list[Package]
-
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
-            fileList += self._ProcessIndex(Settings.SkelPath(), file, True)
-
-        return [x for x in fileList if x.Latest]
 
     def _ProcessIndex(self, indexRoot: str, index: str, skipUpdateCheck: bool) -> list[Package]:
         """

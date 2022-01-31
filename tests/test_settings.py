@@ -119,6 +119,18 @@ class TestSettings(unittest.TestCase):
         Settings.Parse(testFile)
         self.test_DefaultSettings()
 
+    def test_ParseCommentOutSettings(self):
+        """Pass a dummy file with different commented out line which are otherwise valid."""
+
+        testFile = [
+            "#set threads = 500",
+            "# set threads = 500",
+            "#    set threads = 500",
+        ]
+
+        Settings.Parse(testFile)
+        self.test_DefaultSettings()
+
     def test_ParseAllSettings(self):
         """Pass a test file with all options set."""
 
@@ -131,7 +143,7 @@ class TestSettings(unittest.TestCase):
         set architecture       = i386
         set contents           = True
         set threads            = 16
-        set authNoChallenge    = False
+        set authNoChallenge    = False      
         set noCheckCertificate = False
         set unlink             = False
         set useProxy           = False
@@ -189,7 +201,7 @@ class TestSettings(unittest.TestCase):
         """Pass a test file with multiple Language options."""
 
         testFile = """
-        set language = "en_GB, en_US, de_DE"
+        set language = en_GB, en_US, de_DE
         """
         testFileLines =  [y for y in (x.strip() for x in testFile.splitlines()) if y]
 

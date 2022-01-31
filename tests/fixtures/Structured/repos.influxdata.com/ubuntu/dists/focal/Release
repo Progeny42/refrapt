@@ -1,0 +1,55 @@
+Origin: InfluxDB
+Label: InfluxDB
+Codename: focal
+Date: Fri, 28 Jan 2022 19:02:03 UTC
+Architectures: i386 amd64 armhf armel arm64
+Components: stable
+Description: Apt repository for InfluxDB
+MD5Sum:
+ 6767b05033df066897b9d7c69afb9271 2111 stable/binary-i386/Packages
+ d6ee1389ced2ab22199448998cb8fa86 933 stable/binary-i386/Packages.gz
+ 6643a2a1fa0603d27b311452a822ddd2 111 stable/binary-i386/Release
+ 7582052ba85d673c1c4034d294a67c21 3186 stable/binary-amd64/Packages
+ d5ec25de5b3f4352e49404044bf06376 1263 stable/binary-amd64/Packages.gz
+ 1f6e917cfba40dbd5212166bf96b8708 112 stable/binary-amd64/Release
+ f50c53540d92e8218360664ea2bd4e66 2119 stable/binary-armhf/Packages
+ 5b19d9dbd1a3bfb14293dd50184a8a0f 938 stable/binary-armhf/Packages.gz
+ be6bb8ad878763757edefb3b007e1dae 112 stable/binary-armhf/Release
+ 734604d005e4c26502f2b1c4edccb719 2119 stable/binary-armel/Packages
+ dbf8b085d4efd3cfa0d195627b394909 937 stable/binary-armel/Packages.gz
+ a02624d59ad3e3ae1c65f862457a9dab 112 stable/binary-armel/Release
+ d80b05e6004d3ae39a09cbf19d887b6f 3186 stable/binary-arm64/Packages
+ 79a3f065d3be40d619cb28d9332bd935 1263 stable/binary-arm64/Packages.gz
+ 337b498831547342ce91c99c188065b2 112 stable/binary-arm64/Release
+SHA1:
+ 3c6d23f9eed1abd617581664c39e9f7628270f00 2111 stable/binary-i386/Packages
+ 1868c8634c1f283d684a1657d72eae5506c137aa 933 stable/binary-i386/Packages.gz
+ b9d1e6d15f284c91a30542df0dfe98f23d5883c7 111 stable/binary-i386/Release
+ 6e03660d17349368c880aa29e17264abc95d334c 3186 stable/binary-amd64/Packages
+ 1516154e5f6f4ba6e59436bddd3779af0b6e82c5 1263 stable/binary-amd64/Packages.gz
+ 9e5c117e5db9685120b93f4cbc68e37823511eb4 112 stable/binary-amd64/Release
+ a73b19338adb96e413dd8b888a7f4116b23a00e4 2119 stable/binary-armhf/Packages
+ 67c7f3cc19fd580f5747f12b57f83593a7b441d1 938 stable/binary-armhf/Packages.gz
+ 634b43edde2a20ccbe1304c411e4c76fcfc5b85e 112 stable/binary-armhf/Release
+ 6ce0172c378d0e73694c8d0a252294e963942346 2119 stable/binary-armel/Packages
+ 0c327961feb0539ef87eb19e636537d8ca098339 937 stable/binary-armel/Packages.gz
+ 107d7d1be0e7d9569774f3e8167da5f46ecb3236 112 stable/binary-armel/Release
+ 97df77e2e49077955ce3a496dfb51950d202364c 3186 stable/binary-arm64/Packages
+ 009c5bd4ae6e91462469b70a401bac591c4cc6c8 1263 stable/binary-arm64/Packages.gz
+ aea7ec2cd7a4f30da93c94d546649a970c0ae7c7 112 stable/binary-arm64/Release
+SHA256:
+ 67dc528358b16369d5508a79f348b96cf030bd7100981590db66a06ef803af73 2111 stable/binary-i386/Packages
+ 3117d973800c7304dd5eef508aab6b5b901d202d83057492f510334b706649b5 933 stable/binary-i386/Packages.gz
+ ffaad15600fcf637fe5d6559e288b80440dbc380dc51ce806f710edcc30a5b9c 111 stable/binary-i386/Release
+ df1dec82c257f2d23dae93529cb72718a8bc653e3957163dc7e2c52667f48558 3186 stable/binary-amd64/Packages
+ a80d23b84f01a0a4188835ca577a9935ec295bdf24a76f34876cafa689ddafd9 1263 stable/binary-amd64/Packages.gz
+ 6672f4efb575aba6e803c7702787ec4407c7f75148f5da3694c082cda1b8a042 112 stable/binary-amd64/Release
+ ea1b4314bcb84b8b72cc474270ac324e0410dff556b05cb3b9da43b0f00f3eb2 2119 stable/binary-armhf/Packages
+ 4a3d372558674fe5ad25cabb2dbdcf78c21f0a8b3894736bf3cfe4bf17610ab8 938 stable/binary-armhf/Packages.gz
+ af6d6867736866fe89e9085e8a6b58cc638500b36b46b6ca910d9f4bc5f546d2 112 stable/binary-armhf/Release
+ 78a1db99579dedad65466b4bc0feebc8933a1e9a9555c90818681a99eb7c6724 2119 stable/binary-armel/Packages
+ 38ce314f8a8d873a4316b17f3ea54519d1df94e5433401fec3dc1bdff5db99b1 937 stable/binary-armel/Packages.gz
+ 80407ee538a8302a8e569273f8821124de0fc96ec19b2707ff4ff7fb19dab1f6 112 stable/binary-armel/Release
+ fa35b7ba9a4e0f6186c23083ccdc7cb6b96e6594f5d96bfade702cd1783ab7a3 3186 stable/binary-arm64/Packages
+ 6c10de39f3fcd1a4401b30ebc02a573f40547ec41b9ee61f890331532ea4ae02 1263 stable/binary-arm64/Packages.gz
+ 7ca20a22c9af18cf77af32d365f19447ca45d839bd88fc61c142cad3c8d2a708 112 stable/binary-arm64/Release

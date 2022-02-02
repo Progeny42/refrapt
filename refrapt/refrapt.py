@@ -17,15 +17,15 @@ import click
 import tqdm
 from filelock import FileLock
 
-from classes import (
+from refrapt.classes import (
     Repository,
     UrlType,
     Downloader,
     LogFilter
 )
 
-from helpers import SanitiseUri
-from settings import Settings
+from refrapt.helpers import SanitiseUri
+from refrapt.settings import Settings
 
 logger = logging.getLogger(__name__)
 

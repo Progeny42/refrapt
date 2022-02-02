@@ -13,8 +13,8 @@ from abc import ABC, abstractmethod
 
 import multiprocessing
 
-from helpers import SanitiseUri, UnzipFile
-from settings import Settings
+from refrapt.helpers import SanitiseUri, UnzipFile
+from refrapt.settings import Settings
 import tqdm
 import filelock
 

@@ -3,7 +3,7 @@
 import unittest
 import re
 
-import helpers
+from refrapt import helpers
 
 class TestHelpers(unittest.TestCase):
     """Test case for the Helpers module."""

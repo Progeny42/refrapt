@@ -7,7 +7,7 @@ import platform
 from pathlib import Path
 import locale
 
-from settings import Settings
+from refrapt.settings import Settings
 
 class TestSettings(unittest.TestCase):
     """Test case for the Settings class."""

@@ -2,7 +2,7 @@
 
 import unittest
 
-from classes import Package
+from refrapt.classes import Package
 
 class TestPackage(unittest.TestCase):
 

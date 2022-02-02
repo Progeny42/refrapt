@@ -6,8 +6,8 @@ from pathlib import Path
 import re
 import os
 
-from settings import Settings
-from classes import (
+from refrapt.settings import Settings
+from refrapt.classes import (
     RepositoryType,
     Repository
 )

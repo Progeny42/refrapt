@@ -46,5 +46,32 @@ class TestHelpers(unittest.TestCase):
             self.assertFalse(re.search(r"^(\w+)://", sanitisedUri))
             self.assertFalse(re.search(r":\d+", sanitisedUri))
 
-if __name__ == '__main__':
-    unittest.main()
+    def test_ConvertSize(self):
+
+        # ConvertSize uses base 2 (1024)
+        values = [ "1.0", "2.0", "4.0", "8.0", "16.0", "32.0", "64.0", "128.0", "256.0", "512.0" ]
+        sizeName = [ "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" ]
+
+        index = 1
+        sizeIndex = 0
+        for i in range(0, 8*11):
+            result = helpers.ConvertSize(2*pow(2,i))
+
+            self.assertEqual(result, values[index] + " " + sizeName[sizeIndex])
+
+            if index == 9:
+                index = 0
+                sizeIndex += 1
+            else:
+                index += 1
+
+    def test_ConvertSize_MassiveValue(self):
+
+        # Values greater than 1023 YB shall be expressed in terms of YB
+        self.assertEqual(helpers.ConvertSize(2*pow(2,(8*11) + 1)), "1024.0 YB")
+        self.assertEqual(helpers.ConvertSize(2*pow(2,(8*11) + 2)), "2048.0 YB")
+        self.assertEqual(helpers.ConvertSize(2*pow(2,(8*11) + 3)), "4096.0 YB")
+        
+    def test_ConvertSize_NegativeValue(self):
+
+        self.assertEqual(helpers.ConvertSize(-1), "0 B")

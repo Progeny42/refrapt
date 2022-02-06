@@ -1,5 +1,6 @@
 """Helper methods for use with Refrapt."""
 
+from argparse import ArgumentError
 import re
 import os
 import gzip
@@ -7,6 +8,7 @@ import lzma
 import bz2
 import shutil
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +57,22 @@ def UnzipFile(file: str):
                 shutil.copyfileobj(f, out)
     else:
         logger.warning(f"File '{file}' has an unsupported compression format")
+
+def ConvertSize(size: int) -> str:
+    """Convert a number of bytes into a number with a suitable unit."""
+    if size <= 0:
+        return "0 B"
+
+    sizeName = [ "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" ]
+    i = int(math.floor(math.log(size, 1024)))
+
+    if i > len(sizeName) - 1:
+        # A massive number has been identified which we don't support units for
+        # I don't expect more than a PB would ever be passed into this, let alone > a YB
+        # Just represent the number in tems of YB
+        i = len(sizeName) - 1
+
+    p = math.pow(1024, i)
+    s = round(size / p, 2)
+
+    return f"{s} {sizeName[i]}"

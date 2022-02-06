@@ -6,7 +6,6 @@ from logging.handlers import RotatingFileHandler
 import os
 import time
 from pathlib import Path
-import math
 import shutil
 import datetime
 
@@ -21,17 +20,18 @@ from refrapt.classes import (
     Repository,
     UrlType,
     Downloader,
-    LogFilter
+    LogFilter,
+    Package
 )
 
-from refrapt.helpers import SanitiseUri
+from refrapt import helpers
 from refrapt.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 repositories = [] # type: list[Repository]
 filesToKeep = list() # type : dict[str]
-appLockFile = "refrapt-lock"
+AppLockFile = "refrapt-lock"
 
 @click.command()
 @click.version_option(pkg_resources.require("refrapt")[0].version)
@@ -42,7 +42,6 @@ def main(conf: str, test: bool, clean: bool):
     """A tool to mirror Debian Repositories for use as a local mirror."""
 
     global repositories
-    global filesToKeep
 
     startTime = time.perf_counter()
     Settings.Init()
@@ -90,13 +89,13 @@ def main(conf: str, test: bool, clean: bool):
             with open(f"{Settings.VarPath()}/{file}") as f:
                 uri = f.readline()
 
-            uri = SanitiseUri(uri)
+            uri = helpers.SanitiseUri(uri)
             if os.path.isfile(f"{Settings.MirrorPath()}/{uri}"):
                 os.remove(f"{Settings.MirrorPath()}/{uri}")
             elif os.path.isfile(f"{Settings.VarPath()}/{uri}"):
                 os.remove(f"{Settings.VarPath()}/{uri}")
             logger.info(f"Removed incomplete download {uri}")
-        if appLockFile in file:
+        if AppLockFile in file:
             # Refrapt was interrupted during processing.
             # To ensure that files which now may not
             # be marked as Modified due to recently being
@@ -110,8 +109,8 @@ def main(conf: str, test: bool, clean: bool):
         os.remove(f"{Settings.VarPath()}/{item}")
 
     # Create a lock file for the Application
-    with FileLock(f"{Settings.VarPath()}/{appLockFile}.lock"):
-        with open(f"{Settings.VarPath()}/{appLockFile}", "w+") as f:
+    with FileLock(f"{Settings.VarPath()}/{AppLockFile}.lock"):
+        with open(f"{Settings.VarPath()}/{AppLockFile}", "w+") as f:
             pass
 
         print()
@@ -121,18 +120,16 @@ def main(conf: str, test: bool, clean: bool):
             PerformMirroring()
 
     # Lock file no longer required
-    os.remove(f"{Settings.VarPath()}/{appLockFile}")
-    if os.path.isfile(f"{Settings.VarPath()}/{appLockFile}.lock"):
+    os.remove(f"{Settings.VarPath()}/{AppLockFile}")
+    if os.path.isfile(f"{Settings.VarPath()}/{AppLockFile}.lock"):
         # Requires manual deletion on Unix
-        os.remove(f"{Settings.VarPath()}/{appLockFile}.lock")
+        os.remove(f"{Settings.VarPath()}/{AppLockFile}.lock")
 
     print()
     logger.info(f"Refrapt completed in {datetime.timedelta(seconds=round(time.perf_counter() - startTime))}")
 
 def PerformClean():
     """Perform the cleaning of files on the local repository."""
-    global repositories
-    global filesToKeep
 
     logger.info("## Clean Mode ##")
     print()
@@ -141,10 +138,10 @@ def PerformClean():
 
     # 1. Ensure that the Repositories are actually on disk
     for repository in repositories:
-        if os.path.isdir(f"{Settings.MirrorPath()}/{SanitiseUri(repository.Uri)}/dists/{repository.Distribution}"):
+        if os.path.isdir(f"{Settings.MirrorPath()}/{helpers.SanitiseUri(repository.Uri)}/dists/{repository.Distribution}"):
             cleanRepositories.append(repository)
         else:
-            logger.debug(f"Repository not found on disk: {SanitiseUri(repository.Uri)} {repository.Distribution}")
+            logger.debug(f"Repository not found on disk: {helpers.SanitiseUri(repository.Uri)} {repository.Distribution}")
 
     # 2. Get the Release files for each of the Repositories
     releaseFiles = []
@@ -152,7 +149,7 @@ def PerformClean():
         releaseFiles += repository.GetReleaseFiles()
 
     for releaseFile in releaseFiles:
-        filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
+        filesToKeep.append(os.path.normpath(helpers.SanitiseUri(releaseFile)))
 
     # 3. Parse the Release files for the list of Index files that are on Disk
     indexFiles = []
@@ -160,7 +157,7 @@ def PerformClean():
         indexFiles += repository.ParseReleaseFilesFromLocalMirror()
 
     for indexFile in indexFiles:
-        filesToKeep.append(os.path.normpath(SanitiseUri(indexFile)))
+        filesToKeep.append(os.path.normpath(helpers.SanitiseUri(indexFile)))
 
     # 4. Generate list of all files on disk according to the Index files
     logger.info("Reading all Packages...")
@@ -179,10 +176,9 @@ def PerformClean():
 def PerformMirroring():
     """Perform the main mirroring function of this application."""
 
-    global repositories
     global filesToKeep
 
-    filesToDownload = list([tuple()]) # type: list[tuple[str, int]]
+    filesToDownload = list() # type: list[Package]
     filesToDownload.clear()
 
     logger.info(f"Processing {len(repositories)} Repositories...")
@@ -194,8 +190,8 @@ def PerformMirroring():
 
     logger.debug("Adding Release Files to filesToKeep:")
     for releaseFile in releaseFiles:
-        logger.debug(f"\t{SanitiseUri(releaseFile)}")
-        filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
+        logger.debug(f"\t{helpers.SanitiseUri(releaseFile)}")
+        filesToKeep.append(os.path.normpath(helpers.SanitiseUri(releaseFile)))
 
     logger.info(f"Compiled a list of {len(releaseFiles)} Release files for download")
     Downloader.Download(releaseFiles, UrlType.Release)
@@ -207,21 +203,21 @@ def PerformMirroring():
 
     logger.debug("Adding Index Files to filesToKeep:")
     for indexFile in indexFiles:
-        logger.debug(f"\t{SanitiseUri(indexFile)}")
-        filesToKeep.append(os.path.normpath(SanitiseUri(indexFile)))
+        logger.debug(f"\t{helpers.SanitiseUri(indexFile)}")
+        filesToKeep.append(os.path.normpath(helpers.SanitiseUri(indexFile)))
 
     print()
     logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
     Downloader.Download(indexFiles, UrlType.Index)
 
-    # Record timestamps of downloaded files to later detemine which files have changed, 
+    # Record timestamps of downloaded files to later detemine which files have changed,
     # and therefore need to be processsed
     for repository in repositories:
         repository.Timestamp()
 
     # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
     print()
-    logger.info(f"Decompressing Packages / Sources Indices...")
+    logger.info("Decompressing Packages / Sources Indices...")
     for repository in tqdm.tqdm(repositories, position=0, unit=" repo", desc="Repositories "):
         repository.DecompressIndexFiles()
 
@@ -229,7 +225,7 @@ def PerformMirroring():
     print()
     logger.info("Building file list...")
     for repository in tqdm.tqdm([x for x in repositories if x.Modified], position=0, unit=" repo", desc="Repositories ", leave=False):
-        filesToDownload += repository.ParseIndexFiles() 
+        filesToDownload += repository.ParseIndexFiles()
 
     # Packages potentially add duplicate downloads, slowing down the rest
     # of the process. To counteract, remove duplicates now
@@ -240,7 +236,7 @@ def PerformMirroring():
         logger.debug(f"\t{file}")
 
     # 5. Perform the main download of Binary and Source files
-    downloadSize = ConvertSize(sum([x.Size for x in filesToDownload if not x.Latest]))
+    downloadSize = helpers.ConvertSize(sum([x.Size for x in filesToDownload if not x.Latest]))
     logger.info(f"Compiled a list of {len([x for x in filesToDownload if not x.Latest])} Binary and Source files of size {downloadSize} for download")
 
     os.chdir(Settings.MirrorPath())
@@ -252,9 +248,9 @@ def PerformMirroring():
         print()
         logger.info("Copying Skel to Mirror")
         for indexUrl in tqdm.tqdm(filesToKeep, unit=" files"):
-            skelFile   = f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"
+            skelFile   = f"{Settings.SkelPath()}/{helpers.SanitiseUri(indexUrl)}"
             if os.path.isfile(skelFile):
-                mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
+                mirrorFile = f"{Settings.MirrorPath()}/{helpers.SanitiseUri(indexUrl)}"
                 copy = True
                 if os.path.isfile(mirrorFile):
                     # Compare files using Timestamp to save moving files that don't need to be
@@ -275,14 +271,14 @@ def PerformMirroring():
 
     if Settings.Test():
         # Remove Release Files and Index Files added to /skel to ensure normal processing
-        # next time the application is run, otherwise the app will think it has all 
+        # next time the application is run, otherwise the app will think it has all
         # the latest files downloaded, when actually it only has the latest /skel Index files
         print()
         os.chdir(Settings.SkelPath())
 
         logger.info("Test mode - Removing Release and Index files from /skel")
         for skelFile in releaseFiles + indexFiles:
-            file = os.path.normpath(f"{Settings.SkelPath()}/{SanitiseUri(skelFile)}")
+            file = os.path.normpath(f"{Settings.SkelPath()}/{helpers.SanitiseUri(skelFile)}")
             if os.path.isfile(file):
                 os.remove(file)
 
@@ -344,18 +340,23 @@ def CreateConfig(conf: str):
 
     logger.info(f"Configuration file created for first use at '{conf}'. Add some Repositories and run again. Application exiting.")
 
-def Clean(repositories: list, requiredFiles: list):
+def Clean(repos: list, requiredFiles: list):
+    """
+        Walk each repository recursively, and determine whether a file is eligible for Cleaning,
+        based on whether the file is marked as required.
+    """
+
     # 5. Determine which files are in the mirror, but not listed in the Index files
     items = [] # type: list[str]
     logger.info("\tCompiling list of files to clean...")
-    uris = {repository.Uri for repository in repositories}
+    uris = {repository.Uri for repository in repos}
     for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False):
         walked = [] # type: list[str]
-        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5):
+        for root, _, files in tqdm.tqdm(os.walk(helpers.SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5):
             for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files        ", leave=False, delay=0.5):
                 walked.append(os.path.join(root, file))
 
-        logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
+        logger.debug(f"{helpers.SanitiseUri(uri)}: Walked {len(walked)} items")
         items += [x for x in walked if os.path.normpath(x) not in requiredFiles and not os.path.islink(x)]
 
     logger.debug(f"Found {len(items)} which can be freed")
@@ -373,10 +374,10 @@ def Clean(repositories: list, requiredFiles: list):
         return
 
     if Settings.Test():
-        logger.info(f"\tFound {ConvertSize(clearSize)} in {len(items)} files and directories that could be freed.")
+        logger.info(f"\tFound {helpers.ConvertSize(clearSize)} in {len(items)} files and directories that could be freed.")
         return
 
-    logger.info(f"\t{ConvertSize(clearSize)} in {len(items)} files and directories will be freed...")
+    logger.info(f"\t{helpers.ConvertSize(clearSize)} in {len(items)} files and directories will be freed...")
 
     # 7. Clean files
     for item in items:
@@ -430,17 +431,6 @@ def PostMirrorClean():
     requiredFiles = list(set(filesToKeep)) + list(set(umodifiedFiles))
 
     Clean(cleanRepositories, requiredFiles)
-
-def ConvertSize(size: int) -> str:
-    """Convert a number of bytes into a number with a suitable unit."""
-    if size == 0:
-        return "0B"
-
-    sizeName = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-    i = int(math.floor(math.log(size, 1024)))
-    p = math.pow(1024, i)
-    s = round(size / p, 2)
-    return "%s %s" % (s, sizeName[i])
 
 def GetRepositories(configData: list) -> list:
     """Determine the Repositories listed in the Configuration file."""

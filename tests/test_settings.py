@@ -208,6 +208,3 @@ class TestSettings(unittest.TestCase):
         Settings.Parse(testFileLines)
 
         self.assertCountEqual(Settings.Language(), ["en", "de"])
-
-if __name__ == '__main__':
-    unittest.main()

@@ -4,38 +4,42 @@ from unittest import TestLoader, TestResult
 import sys
 from pathlib import Path
 import logging
+import argparse
 
 import coverage
 import colorama
 from colorama import Fore, Style
 
-def Suite():
+def Suite(args):
     """Loads each of the test files in the test directory, runs them, and then prints the results."""
-    
+
     testLoader = TestLoader()
     testResult = TestResult()
 
     sourceDirectory = str(Path(__file__).parent.parent.absolute()) + "/refrapt/"
 
-    cov = coverage.Coverage(branch=True, source=[sourceDirectory])
-    cov.start()
+    if args.coverage:
+        cov = coverage.Coverage(branch=True, source=[sourceDirectory])
+        cov.start()
 
-    logging.disable(logging.CRITICAL)
+    if not args.logging:
+        logging.disable(logging.CRITICAL)
 
     testDirectory = str(Path(__file__).parent.absolute())
     testSuite = testLoader.discover(testDirectory, pattern='test_*.py')
     testSuite.run(result=testResult)
 
-    logging.disable(logging.NOTSET)
+    if not args.logging:
+        logging.disable(logging.NOTSET)
 
-    cov.stop()
-    cov.save()
-    cov.html_report()
+    if args.coverage:
+        cov.stop()
+        cov.save()
+        cov.html_report()
 
     print("-------------------------------------")
     print("Refrapt Test Results")
     print("-------------------------------------\n")
-
 
     if testResult.skipped:
         print(f"{Style.DIM}Skipped:")
@@ -113,4 +117,9 @@ def PrintStats(testResult : TestResult):
 
 if __name__ == '__main__':
     colorama.init(autoreset=True)
-    Suite()
+
+    parser = argparse.ArgumentParser(description='Run Refrapt tests.')
+    parser.add_argument('-l', "--logging", dest='logging', action='store_true', default=False, help="Enable Refrapt logger")
+    parser.add_argument('-c', "--coverage", dest='coverage', action='store_true', default=False, help="Enable code Coverage")
+
+    Suite(parser.parse_args())

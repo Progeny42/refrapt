@@ -4,7 +4,6 @@ import unittest
 from urllib import parse
 from pathlib import Path
 import re
-import os
 
 from refrapt.settings import Settings
 from refrapt.classes import (
@@ -21,8 +20,8 @@ class TestRepository_Init(unittest.TestCase):
     """Test case for the Repository.Init method."""
 
     _missingParams = [
-        ("", ""), 
-        ("", "An Architecture"), 
+        ("", ""),
+        ("", "An Architecture"),
         ("Random data", "")
     ]
 
@@ -73,7 +72,6 @@ class TestRepository_Init(unittest.TestCase):
     ]
 
     def test_InitValidRepos(self):
-        
 
         for repo in self._validRepos:
             with self.subTest():
@@ -192,7 +190,7 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
         # Ensure we actually got some files
         self.assertTrue(len(indexFiles) > 0)
 
-        # For the configuration settings in the tests, we can expect the following Regexes to apply:       
+        # For the configuration settings in the tests, we can expect the following Regexes to apply:
         #   rf"{component}/binary-{architecture}/Release"
         #   rf"{component}/binary-{architecture}/Packages"
         #   rf"{component}/binary-{architecture}/Packages[^./]*(\.gz|\.bz2|\.xz|$)$"
@@ -207,45 +205,44 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
         for architecture in repository.Architectures:
             if Settings.Contents() and repository.RepositoryType == RepositoryType.Bin:
                 regexes.append(rf"Contents-{architecture}")
-            for component in repository.Components:
-                if Settings.Contents() and repository.RepositoryType == RepositoryType.Bin:
-                    regexes.append(rf"{component}/Contents-{architecture}")
-                regexes.append(rf"{component}/binary-{architecture}/Release")
-                regexes.append(rf"{component}/binary-{architecture}/Packages")
-                regexes.append(rf"{component}/binary-{architecture}/Packages[^./]*(\.gz|\.bz2|\.xz|$)$")
-                regexes.append(rf"{component}/cnf/Commands-{architecture}")
-                regexes.append(rf"{component}/i18n/cnf/Commands-{architecture}")
-                regexes.append(rf"{component}/i18n/Index")
 
-                for language in Settings.Language():
-                    regexes.append(rf"{component}/i18n/Translation-{language}")
+            if repository.Components:
+                for component in repository.Components:
+                    if Settings.Contents() and repository.RepositoryType == RepositoryType.Bin:
+                        regexes.append(rf"{component}/Contents-{architecture}")
+                    regexes.append(rf"{component}/binary-{architecture}/Release")
+                    regexes.append(rf"{component}/binary-{architecture}/Packages")
+                    regexes.append(rf"{component}/binary-{architecture}/Packages[^./]*(\.gz|\.bz2|\.xz|$)$")
+                    regexes.append(rf"{component}/cnf/Commands-{architecture}")
+                    regexes.append(rf"{component}/i18n/cnf/Commands-{architecture}")
+                    regexes.append(rf"{component}/i18n/Index")
 
-                regexes.append(rf"{component}/dep11/(Components-{architecture}\.yml|icons-[^./]+\.tar)")
+                    for language in Settings.Language():
+                        regexes.append(rf"{component}/i18n/Translation-{language}")
 
-                if Settings.ByHash() and repository.RepositoryType == RepositoryType.Bin:
-                    for checksumType in self._checksumTypes:
-                        # TODO : I don't know why, but this does not appear to work for the ByHash test
-                        regexes.append(rf"{baseUrl}{component}/binary-{architecture}/by-hash/{checksumType}/\w+")
-                        regexes.append(rf"{baseUrl}{component}/cnf/by-hash/{checksumType}/\w+")
-                        regexes.append(rf"{baseUrl}{component}/i18n/by-hash/{checksumType}/\w+")
-                        regexes.append(rf"{baseUrl}{component}/dep11/by-hash/{checksumType}/\w+")
+                    regexes.append(rf"{component}/dep11/(Components-{architecture}\.yml|icons-[^./]+\.tar)")
 
-        # Check that all files downloaded match a Regex expression
-        for file in indexFiles:
-            found = False
-            for regex in regexes:
-                match = re.match(regex, file.replace(baseUrl, ""))
+                    if Settings.ByHash() and repository.RepositoryType == RepositoryType.Bin:
+                        for checksumType in self._checksumTypes:
+                            regexes.append(rf"{component}/binary-{architecture}/by-hash/{checksumType}/\w+")
+                            regexes.append(rf"{component}/cnf/by-hash/{checksumType}/\w+")
+                            regexes.append(rf"{component}/i18n/by-hash/{checksumType}/\w+")
+                            regexes.append(rf"{component}/dep11/by-hash/{checksumType}/\w+")
+            else:
+                # Cannot verify flat repos, as there is no structure, it's just the baseUrl/file
+                pass
 
-                if match != None:
-                    found = found or match
-
-            if not found:
+        if repository.Components:
+            # Check that all files downloaded match a Regex expression
+            for file in indexFiles:
+                found = False
                 for regex in regexes:
-                    print(regex.replace(baseUrl, ""))
-                f = file.replace(baseUrl, "")
-                print(f"File: '{f}'")
+                    match = re.match(regex, file.replace(baseUrl, ""))
 
-            self.assertTrue(found)
+                    if match is not None:
+                        found = found or match
+
+                self.assertTrue(found)
 
     _structuredRepos = [
         "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse",
@@ -258,6 +255,7 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
         "deb [arch=amd64,i386] http://security.debian.org buster/updates main contrib non-free",
         "deb [arch=amd64,i386,armhf] http://archive.raspberrypi.org/debian buster main",
     ]
+    # TODO : Add deb-src to _structuredRepos
 
     def test_ParseReleaseFilesFromLocalMirror_Structured(self):
         # Need to setup the Settings specifically for this test
@@ -266,7 +264,7 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
         f"set mirrorPath = {_fixturesDirectory}/Structured",
         "set contents  = False",
         "set byHash    = False",
-        "set language  = 'en_GB, de_DE'",
+        "set language  = en_GB, de_DE",
         ]
         Settings.Parse(dummyConfig)
 
@@ -285,7 +283,7 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
         f"set mirrorPath = {_fixturesDirectory}/Structured",
         "set contents  = True",
         "set byHash    = False",
-        "set language  = 'en_GB, de_DE'",
+        "set language  = en_GB, de_DE",
         ]
         Settings.Parse(dummyConfig)
 
@@ -297,7 +295,6 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
 
                 self._ParseReleaseFilesChecks(repository, indexFiles)
 
-
     def test_ParseReleaseFilesFromLocalMirror_StructuredByHash(self):
         # Need to setup the Settings specifically for this test
         Settings.Init()
@@ -305,7 +302,7 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
         f"set mirrorPath = {_fixturesDirectory}/Structured",
         "set contents  = False",
         "set byHash    = True",
-        "set language  = 'en_GB, de_DE'",
+        "set language  = en_GB, de_DE",
         ]
         Settings.Parse(dummyConfig)
 
@@ -314,6 +311,181 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
                 repository = Repository(repo, "amd64")
 
                 indexFiles = repository.ParseReleaseFilesFromLocalMirror() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromRemote_Structured(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Structured",
+        "set contents  = False",
+        "set byHash    = False",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._structuredRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromRemote() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromRemote_StructuredWithContents(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Structured",
+        "set contents  = True",
+        "set byHash    = False",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._structuredRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromRemote() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromRemote_StructuredByHash(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Structured",
+        "set contents  = False",
+        "set byHash    = True",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._structuredRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromRemote() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    _flatRepos = [
+        "deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64",
+    ]
+
+    def test_ParseReleaseFilesFromLocalMirror_Flat(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set mirrorPath = {_fixturesDirectory}/Flat",
+        "set contents  = False",
+        "set byHash    = False",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._flatRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromLocalMirror() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromLocalMirror_FlatWithContents(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set mirrorPath = {_fixturesDirectory}/Flat",
+        "set contents  = True",
+        "set byHash    = False",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._flatRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromLocalMirror() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromLocalMirror_FlatByHash(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set mirrorPath = {_fixturesDirectory}/Flat",
+        "set contents  = False",
+        "set byHash    = True",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._flatRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromLocalMirror() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromRemote_Flat(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Flat",
+        "set contents  = False",
+        "set byHash    = False",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._flatRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromRemote() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromRemote_FlatWithContents(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Flat",
+        "set contents  = True",
+        "set byHash    = False",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._flatRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromRemote() # type: list[str]
+
+                self._ParseReleaseFilesChecks(repository, indexFiles)
+
+    def test_ParseReleaseFilesFromRemote_FlatByHash(self):
+        # Need to setup the Settings specifically for this test
+        Settings.Init()
+        dummyConfig = [
+        f"set skelPath = {_fixturesDirectory}/Flat",
+        "set contents  = False",
+        "set byHash    = True",
+        "set language  = en_GB, de_DE",
+        ]
+        Settings.Parse(dummyConfig)
+
+        for repo in self._flatRepos:
+            with self.subTest():
+                repository = Repository(repo, "amd64")
+
+                indexFiles = repository.ParseReleaseFilesFromRemote() # type: list[str]
 
                 self._ParseReleaseFilesChecks(repository, indexFiles)
 
@@ -411,166 +583,164 @@ class TestRepository_ParseReleaseFilesFromLocalMirror(unittest.TestCase):
 #     #     for file in repository.GetIndexFiles(False):
 #     #         self.assertTrue(any(file in s for s in indexFiles))
 
-# class TestRepository_Properties(unittest.TestCase):
-#     """Test case for each of the Repository class Properties."""
+class TestRepository_Properties(unittest.TestCase):
+    """Test case for each of the Repository class Properties."""
 
-#     def test_RepositoryType_Binary(self):
-#         """Test that a Binary Repository is correctly identified."""
+    def test_RepositoryType_Binary(self):
+        """Test that a Binary Repository is correctly identified."""
 
-#         line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
-#         repository = Repository(line, "amd64")
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        repository = Repository(line, "amd64")
 
-#         self.assertEqual(repository.RepositoryType, RepositoryType.Bin)
+        self.assertEqual(repository.RepositoryType, RepositoryType.Bin)
 
-#     def test_RepositoryType_Source(self):
-#         """Test that a Source Repository is correctly identified."""
+    def test_RepositoryType_Source(self):
+        """Test that a Source Repository is correctly identified."""
 
-#         line = "deb-src [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
-#         repository = Repository(line, "amd64")
+        line = "deb-src [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main restricted universe multiverse"
+        repository = Repository(line, "amd64")
 
-#         self.assertEqual(repository.RepositoryType, RepositoryType.Src)
+        self.assertEqual(repository.RepositoryType, RepositoryType.Src)
 
-#     def test_Uri(self):
-#         """Test that a Uri is correctly identified."""
+    def test_Uri(self):
+        """Test that a Uri is correctly identified."""
 
-#         uris = [
-#             "http://gb.archive.ubuntu.com/ubuntu",
-#             "http://ftp.debian.org/debian",
-#             "http://security.debian.org",
-#             "http://archive.raspberrypi.org/debian",
-#             "http://raspbian.raspberrypi.org/raspbian",
-#             "https://repos.influxdata.com/debian",
-#             "https://repos.influxdata.com/ubuntu",
-#             "http://ppa.launchpad.net/ansible/ansible/ubuntu",
-#             "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64"
-#         ]
+        uris = [
+            "http://gb.archive.ubuntu.com/ubuntu",
+            "http://ftp.debian.org/debian",
+            "http://security.debian.org",
+            "http://archive.raspberrypi.org/debian",
+            "http://raspbian.raspberrypi.org/raspbian",
+            "https://repos.influxdata.com/debian",
+            "https://repos.influxdata.com/ubuntu",
+            "http://ppa.launchpad.net/ansible/ansible/ubuntu",
+            "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64"
+        ]
 
-#         for uri in uris:
-#             line = f"deb [arch=amd64] {uri} dist component1"
-#             repository = Repository(line, "amd64")
+        for uri in uris:
+            line = f"deb [arch=amd64] {uri} dist component1"
+            repository = Repository(line, "amd64")
 
-#             self.assertEqual(repository.Uri, uri)
+            self.assertEqual(repository.Uri, uri)
 
-#     def test_Distribution(self):
-#         """Test that a Distribution is correctly identified."""
-        
-#         distributions = [
-#             "focal",
-#             "focal-security",
-#             "focal-updates",
-#             "focal-proposed",
-#             "focal-backports",
-#             "buster",
-#             "buster-updates",
-#             "buster/updates",
-#             ""
-#         ]
+    def test_Distribution(self):
+        """Test that a Distribution is correctly identified."""
 
-#         for dist in distributions:
-#             line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu {dist}"
-#             if dist:
-#                 line += " component1"
+        distributions = [
+            "focal",
+            "focal-security",
+            "focal-updates",
+            "focal-proposed",
+            "focal-backports",
+            "buster",
+            "buster-updates",
+            "buster/updates",
+        ]
 
-#             repository = Repository(line, "amd64")
-#             self.assertEqual(repository.Distribution, dist)
+        for dist in distributions:
+            line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu {dist}"
+            if dist:
+                line += " component1"
 
-#     def test_Components(self):
-#         """Test that Components are correctly identified."""
-        
-#         componentList = [
-#             ["main", "restricted", "universe", "multiverse"],
-#             ["main", "contrib", "non-free"],
-#             ["main"],
-#             ["stable"],
-#             []
-#         ]
+            repository = Repository(line, "amd64")
+            self.assertEqual(repository.Distribution, dist)
 
-#         for components in componentList:
-#             line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu dist {' '.join(components)}"
+    def test_Components(self):
+        """Test that Components are correctly identified."""
 
-#             repository = Repository(line, "amd64")
-#             self.assertListEqual(repository.Components, components)
+        componentList = [
+            ["main", "restricted", "universe", "multiverse"],
+            ["main", "contrib", "non-free"],
+            ["main"],
+            ["stable"],
+        ]
 
-#     def test_Architectures(self):
-#         """Test that Architectures are correctly identified."""
-        
-#         architectures = [
-#             "Alpa",
-#             "Arm",
-#             "Armel",
-#             "armhf",
-#             "arm64",
-#             "hppa",
-#             "i386",
-#             "amd64",
-#             "ia64",
-#             "m68k",
-#             "mips",
-#             "mipsel",
-#             "mipsel",
-#             "mips64el",
-#             "PowerPC",
-#             "PPC64",
-#             "ppc64el",
-#             "riscv64",
-#             "s390",
-#             "s390x",
-#             "SH4",
-#             "sparc64",
-#             "x32",
-#             "amd64,i386,armhf",
-#             "amd64 , i386 , armhf",
-#         ]
+        for components in componentList:
+            line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu dist {' '.join(components)}"
 
-#         for arch in architectures:
-#             line = f"deb [arch={arch}] http://gb.archive.ubuntu.com/ubuntu dist"
+            repository = Repository(line, "amd64")
+            self.assertListEqual(repository.Components, components)
 
-#             repository = Repository(line, "default")
+    def test_Architectures(self):
+        """Test that Architectures are correctly identified."""
 
-#             if "," in arch:
-#                 self.assertListEqual(arch.split(","), repository.Architectures)
-#             else:
-#                 self.assertIn(arch, repository.Architectures)
+        architectures = [
+            "Alpa",
+            "Arm",
+            "Armel",
+            "armhf",
+            "arm64",
+            "hppa",
+            "i386",
+            "amd64",
+            "ia64",
+            "m68k",
+            "mips",
+            "mipsel",
+            "mipsel",
+            "mips64el",
+            "PowerPC",
+            "PPC64",
+            "ppc64el",
+            "riscv64",
+            "s390",
+            "s390x",
+            "SH4",
+            "sparc64",
+            "x32",
+            "amd64,i386,armhf",
+            "amd64, i386, armhf",
+        ]
 
-#     def test_Clean(self):
-#         """Test that Clean Property is correctly read."""
+        for arch in architectures:
+            line = f"deb [arch={arch}] http://gb.archive.ubuntu.com/ubuntu dist comp1"
 
-#         line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu dist"
+            repository = Repository(line, "default")
 
-#         repository = Repository(line, "default")
+            if "," in arch:
+                self.assertListEqual([x.strip() for x in arch.split(",")], repository.Architectures)
+            else:
+                self.assertIn(arch, repository.Architectures)
 
-#         # Clean is defuault behaviour
-#         self.assertTrue(repository.Clean)
+    def test_Clean(self):
+        """Test that Clean Property is correctly read."""
 
-#         repository.Clean = False
-#         self.assertFalse(repository.Clean)
+        line = "deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu dist comp1"
 
-#     # def test_Modified(self):
-#     #     """Test that Modified is correctly identified."""
+        repository = Repository(line, "default")
 
-#     #     # Need to setup the Settings specifically for this test
-#     #     Settings.Init()
-#     #     dummyConfig = [
-#     #     f"set skelPath = {_fixturesDirectory}/Structured",
-#     #     "set contents  = False",
-#     #     "set byHash    = False",
-#     #     "set language  = 'en_GB'",
-#     #     ]
-#     #     Settings.Parse(dummyConfig)
+        # Clean is defuault behaviour
+        self.assertTrue(repository.Clean)
 
-#     #     line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main"
+        repository.Clean = False
+        self.assertFalse(repository.Clean)
 
-#     #     repository = Repository(line, "default")
+    # def test_Modified(self):
+    #     """Test that Modified is correctly identified."""
 
-#     #     # No files added to Collection, so Repository is unmodified
-#     #     self.assertFalse(repository.Modified)
+    #     # Need to setup the Settings specifically for this test
+    #     Settings.Init()
+    #     dummyConfig = [
+    #     f"set skelPath = {_fixturesDirectory}/Structured",
+    #     "set contents  = False",
+    #     "set byHash    = False",
+    #     "set language  = 'en_GB'",
+    #     ]
+    #     Settings.Parse(dummyConfig)
 
-#     #     # Parse files to set Current Timestamps of existing files
-#     #     repository.ParseReleaseFiles()
-#     #     self.assertTrue(repository.Modified) # Current Timestamp != 0 (default Download timestamp)
+    #     line = f"deb [arch=amd64] http://gb.archive.ubuntu.com/ubuntu focal main"
 
-#     #     repository.Timestamp()
-#     #     self.assertFalse(repository.Modified) # Current Timestamp == Modified Timestamp
+    #     repository = Repository(line, "default")
+
+    #     # No files added to Collection, so Repository is unmodified
+    #     self.assertFalse(repository.Modified)
+
+    #     # Parse files to set Current Timestamps of existing files
+    #     repository.ParseReleaseFiles()
+    #     self.assertTrue(repository.Modified) # Current Timestamp != 0 (default Download timestamp)
+
+    #     repository.Timestamp()
+    #     self.assertFalse(repository.Modified) # Current Timestamp == Modified Timestamp
 
 if __name__ == '__main__':
     unittest.main()

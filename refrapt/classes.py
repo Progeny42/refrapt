@@ -11,14 +11,11 @@ import collections
 from pathlib import Path
 from abc import ABC, abstractmethod
 
-import multiprocessing
-
-from refrapt.helpers import SanitiseUri, UnzipFile
-from refrapt.settings import Settings
 import tqdm
 import filelock
 
-import sys
+from refrapt.helpers import SanitiseUri, UnzipFile
+from refrapt.settings import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +31,10 @@ class UrlType(Enum):
     Release     = 2
 
 class Package:
+    """Represents a Package."""
+
     def __init__(self, filename: str, size: int, latest: bool):
+        """Initialise a Package."""
 
         assert filename, "Filename is None"
         assert size > 0, "Size is not positive"
@@ -46,14 +46,17 @@ class Package:
 
     @property
     def Filename(self) -> str:
+        """Get the Filename."""
         return self._Filename
 
     @property
     def Size(self) -> int:
+        """Get the Size."""
         return self._Size
 
     @property
     def Latest(self) -> bool:
+        """Get whether this package is the latest (up to date)."""
         return self._Latest
 
 class Repository:
@@ -103,7 +106,7 @@ class Repository:
         # Components (optional)
         components = elements.group(9)
         if components:
-            self._components = [x.strip() for x in components.split(" ")]          
+            self._components = [x.strip() for x in components.split(" ")]
 
         self._packageCollection = PackageCollection(self._components, self._architectures)
         self._sourceCollection  = SourceCollection(self._components)
@@ -123,14 +126,13 @@ class Repository:
             Get the Release files for the Repository.
 
             Section 1.1 of the DebianRepository Format document states:
-            - "To download packages from a repository, apt would download a InRelease or Release file from the 
+            - "To download packages from a repository, apt would download a InRelease or Release file from the
             $ARCHIVE_ROOT/dists/$DISTRIBUTION directory."
             - "InRelease files are signed in-line while Release files should have an accompanying Release.gpg file."
             - https://wiki.debian.org/DebianRepository/Format#Overview
 
             Section 1.2 defines these files as "Release" files.
             - https://wiki.debian.org/DebianRepository/Format#A.22Release.22_files
-            
         """
 
         baseUrl = self._uri + "/"
@@ -150,7 +152,7 @@ class Repository:
 
     def ParseReleaseFilesFromLocalMirror(self) -> list:
         """
-            Get a list of all Index files from the Release file 
+            Get a list of all Index files from the Release file
             using the files that exist in the /mirror directory.
         """
 
@@ -158,7 +160,7 @@ class Repository:
 
     def ParseReleaseFilesFromRemote(self) -> list:
         """
-            Get a list of all Index files from the Release file 
+            Get a list of all Index files from the Release file
             using the files that exist in the /skel directory.
         """
 
@@ -166,7 +168,7 @@ class Repository:
 
     def Timestamp(self):
         """Record the timestamps for all 'Packages' or 'Sources' Indices."""
-        
+
         if self._repositoryType == RepositoryType.Bin:
             self._packageCollection.DetermineDownloadTimestamps()
         elif self._repositoryType == RepositoryType.Src:
@@ -174,7 +176,7 @@ class Repository:
 
     def DecompressIndexFiles(self):
         """
-            Decompress the Binary Package Indices (Binary Repository) or 
+            Decompress the Binary Package Indices (Binary Repository) or
             Source Indices (Source Repository).
         """
 
@@ -195,17 +197,17 @@ class Repository:
 
     def ParseIndexFiles(self) -> list[Package]:
         """
-            Read the Binary Package Indices (Binary Repository) or 
+            Read the Binary Package Indices (Binary Repository) or
             Source Indices (Source Repository) for all Filenames.
 
             Section 1.4 of the DebianRepository Format document states:
-            - "[The files] consist of multiple paragraphs ... and the additional 
+            - "[The files] consist of multiple paragraphs ... and the additional
               fields defined in this section, precisely:
                 - Filename (mandatory)"
             - https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices
 
             Only the filename is of interest in order to download it.
-        """       
+        """
 
         indices = self._GetIndexFiles(True) # Modified files only
 
@@ -219,33 +221,33 @@ class Repository:
     def ParseIndexFilesFromLocalMirror(self) -> list[Package]:
         """Get all items listed in the Index files that exist within the /mirror directory."""
 
-        # The Force setting needs to be enabled so that a Repository will return all Index Files, 
+        # The Force setting needs to be enabled so that a Repository will return all Index Files,
         # and not just modified ones. The dependency isn't great, but this feature is an add-on
         # and not part of the initial design
         Settings.SetForce()
 
         indices = self._GetIndexFiles(True) # All files due to Force being Enabled
 
-        fileList = [] # type: list[str]
+        fileList = [] # type: list[Package]
 
         for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
             fileList += self._ProcessIndex(Settings.MirrorPath(), file, True)
-        
+
         return fileList
 
-    def ParseUnmodifiedIndexFiles(self) -> list[str]:
+    def ParseUnmodifiedIndexFiles(self) -> list[Package]:
         """
-            Read the Binary Package Indices (Binary Repository) or 
+            Read the Binary Package Indices (Binary Repository) or
             Source Indices (Source Repository) for all Filenames.
 
             Section 1.4 of the DebianRepository Format document states:
-            - "[The files] consist of multiple paragraphs ... and the additional 
+            - "[The files] consist of multiple paragraphs ... and the additional
               fields defined in this section, precisely:
                 - Filename (mandatory)"
             - https://wiki.debian.org/DebianRepository/Format#A.22Packages.22_Indices
 
             Only the filename is of interest in order to download it.
-        """       
+        """
 
         indices = self._GetIndexFiles(False) # Unmodified files only
 
@@ -270,7 +272,7 @@ class Repository:
             the MD5Sum, SHA1 and SHA256 fields are parsed.
 
             Section 1.2.10 states:
-            - "Those fields shall be multi-line fields containing multiple lines of whitespace separated data. 
+            - "Those fields shall be multi-line fields containing multiple lines of whitespace separated data.
                Each line shall contain;
                 - The checksum of the file in the format corresponding to the field
                 - The size of the file (integer >= 0)
@@ -363,7 +365,7 @@ class Repository:
                                             indexFiles.append(f"{baseUrl}{filename}")
                                             if Settings.ByHash():
                                                 indexFiles.append(i18nByHash)
-                                       
+
                                         for language in Settings.Language():
                                             if re.match(rf"{component}/i18n/Translation-{language}", filename):
                                                 indexFiles.append(f"{baseUrl}{filename}")
@@ -401,7 +403,6 @@ class Repository:
 
         return list(set(indexFiles)) # Remove duplicates caused by reading multiple listings for each checksum type
 
-
     def _ProcessIndex(self, indexRoot: str, index: str, skipUpdateCheck: bool) -> list[Package]:
         """
             Processes each package listed in the Index file.
@@ -426,7 +427,7 @@ class Repository:
         packages = indexFile.GetPackages() # type: list[dict[str,str]]
 
         mirror = Settings.MirrorPath() + "/" + path
-        
+
         for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages     ", leave=False, delay=0.5):
             if "Filename" in package:
                 # Packages Index
@@ -434,7 +435,7 @@ class Repository:
 
                 if filename.startswith("./"):
                     filename = filename[2:]
-                
+
                 packageList.append(Package(os.path.normpath(f"{path}/{filename}"), int(package["Size"]), skipUpdateCheck or not self._NeedUpdate(os.path.normpath(f"{mirror}/{filename}"), int(package["Size"]))))
             else:
                 # Sources Index
@@ -451,7 +452,7 @@ class Repository:
                             if filename.startswith("./"):
                                 filename = filename[2:]
 
-                            packageList.append(Package(os.path.normpath(f"{path}/{directory}/{filename}"), int(package["Size"]), skipUpdateCheck or not self._NeedUpdate(os.path.normpath(f"{mirror}/{directory}/{filename}"), int(package["Size"]))))
+                            packageList.append(Package(os.path.normpath(f"{path}/{directory}/{filename}"), size, skipUpdateCheck or not self._NeedUpdate(os.path.normpath(f"{mirror}/{directory}/{filename}"), size)))
 
         if [x for x in packageList if not x.Latest]:
             logger.debug(f"Packages to update ({len([x for x in packageList if not x.Latest])}):")
@@ -493,7 +494,7 @@ class Repository:
 
     def _GetIndexFiles(self, modified: bool) -> list:
         """
-            Get all Binary Package Indices (Binary Repository) or 
+            Get all Binary Package Indices (Binary Repository) or
             Source Indices (Source Repository) for the Repository.
         """
 
@@ -553,9 +554,11 @@ class Repository:
         elif self._repositoryType == RepositoryType.Src:
             return len(self._sourceCollection.ModifiedFiles) > 0
 
+        assert False, "Unknown Repository Type"
+
 class Timestamp:
     """Simple Timestamp class for measuring before and after of a file."""
-    
+
     def __init__(self):
         """Initialise timestamps to 0.0."""
         self._currentTimestamp = 0.0
@@ -592,17 +595,14 @@ class IndexCollection(ABC):
     @abstractmethod
     def _GetFiles(self, modified: bool) -> list:
         """Get a list of all files based on whether they have been modified or not."""
-        pass
 
     @abstractmethod
     def DetermineCurrentTimestamps(self):
         """Record the current Timestamp of a file."""
-        pass
 
     @abstractmethod
     def DetermineDownloadTimestamps(self):
         """Record the current Timestamp of a file after download."""
-        pass
 
     @property
     def ModifiedFiles(self) -> list:
@@ -838,7 +838,7 @@ class Downloader:
     @staticmethod
     def CustomArguments() -> list:
         """Creates custom Wget arguments based on the Settings provided."""
-        arguments = []
+        arguments = [] # type: list[str]
 
         if Settings.AuthNoChallenge():
             arguments.append("--auth-no-challenge")
@@ -892,7 +892,7 @@ class Index:
         """
             Get a list of all Packages listed in the file.
 
-            Although DebianRepository Format document states that "Packages" Indices 
+            Although DebianRepository Format document states that "Packages" Indices
             and "Sources" Indices are formatted based on different formats, both
             contain some common fields, so can be processed identically here.
 
@@ -929,8 +929,6 @@ class Index:
                         key = None
 
         return packages
-
-
 
 class LogFilter(object):
     """Class to provide filtering for logging.

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Settings:
     """Settings singleton for the application."""
 
-    _settings = { "rootPath"          : f"{str(Path.home())}/refrapt" }
+    _settings = { "rootPath"          : f"{str(Path.home())}/refrapt" } # type: dict[str, Any]
     _force = False
 
     @staticmethod
@@ -62,7 +62,7 @@ class Settings:
 
         optionRegex = r"^set (\w+) *= (([a-zA-Z0-9_:\/\\]+)(, \w+)*|(\"\w*\")) *(#.*)*$"
 
-        for line in config:
+        for line in [x for x in config if x.startswith("set")]:
             optionExpression = re.match(optionRegex, line)
             if optionExpression:
                 name = optionExpression.group(1)
@@ -90,18 +90,18 @@ class Settings:
                 else:
                     logger.warning(f"Unknown setting in configuration file: '{name}'")
             else:
-               logger.debug(f"Ignored line in configuration file: {line}")
+                logger.warning(f"Invalid syntax for Option in configuration file: {line}")
 
         Settings._StripToLanguage()
-    
+
     @staticmethod
     def _StripToLanguage():
         """Strip Region / Script codes from Language codes in order to capture more files."""
-        
+
         languages = Settings.Language()
-        for index, locale in enumerate(languages):
-            if "_" in locale:
-                Settings._settings["language"][index] = locale.split("_")[0]
+        for index, subindex in enumerate(languages):
+            if "_" in subindex:
+                Settings._settings["language"][index] = subindex.split("_")[0]
 
         # There may be duplicates if multiple Regions / Scripts for the same Language were selected
         # Remove duplicates by casting to a Set, then back to List for usage
@@ -245,4 +245,4 @@ class Settings:
     @staticmethod
     def CleanEnabled() -> bool:
         """Get whether cleaning has been globally enabled."""
-        return bool(Settings._settings["disableClean"]) == False
+        return bool(Settings._settings["disableClean"]) is False

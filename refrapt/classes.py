@@ -393,6 +393,19 @@ class Repository:
 
         return [x for x in fileList if x.Latest]
 
+    def Exists(self) -> bool:
+        """
+            Check whether the a directory for this Repository was created on disk
+            after Download. If it does not, this Repository could not be found online.
+        """
+
+        repositoryDirectory = Settings.SkelPath() + "/" + SanitiseUri(self._uri)
+
+        logger.debug(f"Checking repo exists: {repositoryDirectory}")
+
+        path = Path(repositoryDirectory)
+        return os.path.isdir(path.parent.absolute())
+
     def _ProcessIndex(self, indexRoot: str, index: str, skipUpdateCheck: bool) -> list[Package]:
         """
             Processes each package listed in the Index file.

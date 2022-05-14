@@ -40,8 +40,8 @@ class Settings:
     def Parse(config: list):
         """Parse the configuration file and set the settings defined."""
         for line in config:
-            if line.startswith("set"):
-                key = line.split("set ")[1].split("=")[0].strip()
+            if line.lstrip().startswith("set"):
+                key = line.lstrip().split("set ")[1].split("=")[0].strip()
 
                 if key in Settings._settings:
                     value = line.split("=")[1].strip().split("#", 1)[0] # Allow for inline comments, but strip them here

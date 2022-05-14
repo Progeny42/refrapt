@@ -199,6 +199,13 @@ def PerformMirroring():
     logger.info(f"Compiled a list of {len(releaseFiles)} Release files for download")
     Downloader.Download(releaseFiles, UrlType.Release)
 
+    # 1a. Verify after the download that the Repositories actually exist
+    allRepos = list(repositories)
+    for repository in allRepos:
+        if not repository.Exists():
+            logger.warning(f"No files were downloaded from Repository '{repository.Uri} {repository.Distribution} {repository.Components}' - Repository will be skipped. Does it actually exist?")
+            repositories.remove(repository)
+
     # 2. Parse the Release files for the list of Index files to download
     indexFiles = []
     for repository in repositories:

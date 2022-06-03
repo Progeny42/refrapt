@@ -251,7 +251,7 @@ def PerformMirroring():
 
     os.chdir(Settings.MirrorPath())
     if not Settings.Test():
-        Downloader.Download([x.Filename for x in filesToDownload], UrlType.Archive)
+        Downloader.Download([x.Filename for x in filesToDownload if not x.Latest], UrlType.Archive)
 
     # 6. Copy Skel to Main Archive
     if not Settings.Test():
@@ -354,7 +354,8 @@ def Clean(repositories: list, requiredFiles: list):
     # 5. Determine which files are in the mirror, but not listed in the Index files
     items = [] # type: list[str]
     logger.info("\tCompiling list of files to clean...")
-    uris = {repository.Uri for repository in repositories}
+    uris = {repository.Uri.rstrip('/') for repository in repositories}
+
     for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False):
         walked = [] # type: list[str]
         for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5):
@@ -362,7 +363,10 @@ def Clean(repositories: list, requiredFiles: list):
                 walked.append(os.path.join(root, file))
 
         logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
-        items += [x for x in walked if os.path.normpath(x) not in requiredFiles and not os.path.islink(x)]
+        items += [os.path.normpath(x) for x in walked if os.path.normpath(x) not in requiredFiles and not os.path.islink(x)]
+
+    # 5a. Remove any duplicate items
+    items = list(set(items))
 
     logger.debug(f"Found {len(items)} which can be freed")
     for item in items:

@@ -19,6 +19,7 @@ import tqdm
 import filelock
 
 import sys
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -831,11 +832,19 @@ class Downloader:
 
         filename = f"{logPath}/Download-lock.{process._identity[0]}"
 
+        # Ensure forward slashes are used for URLs
+        normalisedUrl = url.replace(os.sep, '/')
+        
+        command = f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {normalisedUrl}"
+
+        if args:
+            command += f" {args}"
+
         with filelock.FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:
-                f.write(url)
+                f.write(normalisedUrl)
 
-            os.system(f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {url} {args}")
+            os.system(command)
 
             os.remove(filename)
 

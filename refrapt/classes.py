@@ -456,7 +456,7 @@ class Repository:
                             if filename.startswith("./"):
                                 filename = filename[2:]
 
-                            packageList.append(Package(os.path.normpath(f"{path}/{directory}/{filename}"), int(package["Size"]), skipUpdateCheck or not self._NeedUpdate(os.path.normpath(f"{mirror}/{directory}/{filename}"), int(package["Size"]))))
+                            packageList.append(Package(os.path.normpath(f"{path}/{directory}/{filename}"), size, skipUpdateCheck or not self._NeedUpdate(os.path.normpath(f"{mirror}/{directory}/{filename}"), size)))
 
         if [x for x in packageList if not x.Latest]:
             logger.debug(f"Packages to update ({len([x for x in packageList if not x.Latest])}):")

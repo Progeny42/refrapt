@@ -824,10 +824,10 @@ class Downloader:
         """Worker method for downloading a particular Url, used in multiprocessing."""
         process = multiprocessing.current_process()
 
-        baseCommand   = "wget --no-cache -N"
+        baseCommand   = "wget --no-cache -N --no-verbose"
         rateLimit     = f"--limit-rate={rateLimit}"
-        retries       = "-t 5"
-        recursiveOpts = "-r -l inf"
+        retries       = "--tries=20 --waitretry=60 --retry-on-http-error=503,429"
+        recursiveOpts = "--recursive --level=inf"
         logFile       = f"-a {logPath}/{kind}-log.{process._identity[0]}"
 
         filename = f"{logPath}/Download-lock.{process._identity[0]}"

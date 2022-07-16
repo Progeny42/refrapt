@@ -16,6 +16,7 @@ import pkg_resources
 import click
 import tqdm
 from filelock import FileLock
+from tendo import singleton
 
 from refrapt.classes import (
     Repository,
@@ -40,6 +41,8 @@ appLockFile = "refrapt-lock"
 @click.option("--clean", is_flag=True, default=False, help="Clean all mirrors of unrequired files.", type=click.BOOL)
 def main(conf: str, test: bool, clean: bool):
     """A tool to mirror Debian Repositories for use as a local mirror."""
+
+    me = singleton.SingleInstance() # will sys.exit(-1) if other instance is running
 
     global repositories
     global filesToKeep

@@ -7,7 +7,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name='Refrapt',
-    version='0.4.4',
+    version='0.4.5',
     description='A tool to mirror Debian repositories for use as a local mirror.',
     python_requires='>=3.9',
     long_description=README,
@@ -23,7 +23,8 @@ setup(
         'Colorama >= 0.4.4',
         'tqdm >= 4.60.0',
         'wget >= 3.2',
-        'filelock == 3.0.12'
+        'filelock == 3.0.12',
+        'tendo == 0.2.15'
     ],
     classifiers=[
         "Development Status :: 4 - Beta",

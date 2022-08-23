@@ -104,7 +104,7 @@ def main(conf: str, test: bool, clean: bool):
             # be marked as Modified due to recently being
             # downloaded, force processing of all files
             logger.info("The previous Refrapt run was interrupted. Full processing will be performed to ensure completeness")
-            Settings.SetForce()
+            Settings.SetPreviousRunInterrupted()
 
     # Delete existing /var files
     logger.info("Removing previous /var files...")

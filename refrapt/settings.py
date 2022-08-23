@@ -34,7 +34,7 @@ class Settings:
         "byHash"            : False,
         "disableClean"      : False
     }
-    _force = False
+    _previousRunInterrupted = False
 
     @staticmethod
     def Parse(config: list):
@@ -186,6 +186,11 @@ class Settings:
         return list(Settings._settings["language"])
 
     @staticmethod
+    def SetForceUpdate():
+        """Set whether updates of files should be forced."""
+        Settings._settings["forceUpdate"] = True
+
+    @staticmethod
     def ForceUpdate() -> bool:
         """Get whether updates of files should be forced."""
         return bool(Settings._settings["forceUpdate"])
@@ -201,14 +206,14 @@ class Settings:
         return bool(Settings._settings["byHash"])
 
     @staticmethod
-    def SetForce():
+    def SetPreviousRunInterrupted():
         """Set whether the application should force full processing in the event of an interrupted run."""
-        Settings._force = True
+        Settings._previousRunInterrupted = True
 
     @staticmethod
-    def Force() -> bool:
+    def PreviousRunInterrupted() -> bool:
         """Get whether the application should force full processing in the event of an interrupted run."""
-        return bool(Settings._force)
+        return bool(Settings._previousRunInterrupted)
 
     @staticmethod
     def CleanEnabled() -> bool:

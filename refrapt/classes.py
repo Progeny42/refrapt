@@ -360,7 +360,7 @@ class Repository:
         # The Force setting needs to be enabled so that a Repository will return all Index Files, 
         # and not just modified ones. The dependency isn't great, but this feature is an add-on
         # and not part of the initial design
-        Settings.SetForce()
+        Settings.SetForceUpdate()
 
         indices = self._GetIndexFiles(True) # All files due to Force being Enabled
 
@@ -694,9 +694,9 @@ class PackageCollection(IndexCollection):
                     addFile = False
 
                     if modified:
-                        addFile = self._packageCollection[component][architecture][file].Modified or Settings.Force()
+                        addFile = self._packageCollection[component][architecture][file].Modified or Settings.PreviousRunInterrupted() or Settings.ForceUpdate()
                     else:
-                        addFile = not self._packageCollection[component][architecture][file].Modified or Settings.Force()
+                        addFile = not self._packageCollection[component][architecture][file].Modified or Settings.PreviousRunInterrupted() or Settings.ForceUpdate()
 
                     if addFile:
                         filename, _ = os.path.splitext(file)
@@ -773,9 +773,9 @@ class SourceCollection(IndexCollection):
                 addFile = False
 
                 if modified:
-                    addFile = self._sourceCollection[component][file].Modified or Settings.Force()
+                    addFile = self._sourceCollection[component][file].Modified or Settings.PreviousRunInterrupted() or Settings.ForceUpdate()
                 else:
-                    addFile = not self._sourceCollection[component][file].Modified or Settings.Force()
+                    addFile = not self._sourceCollection[component][file].Modified or Settings.PreviousRunInterrupted() or Settings.ForceUpdate()
 
                 if addFile:
                     filename, _ = os.path.splitext(file)

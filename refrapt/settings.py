@@ -7,6 +7,8 @@ import locale
 logger = logging.getLogger(__name__)
 
 class Settings:
+    """Contains the loaded settings for the application."""
+
     _settings = {
         "architecture"      : platform.machine(),
         "rootPath"          : f"{str(Path.home())}/refrapt",
@@ -27,7 +29,7 @@ class Settings:
         "caCertificate"     : "",
         "privateKey"        : "",
         "limitRate"         : "500m", # Wget syntax
-        "language"          : [ locale.getdefaultlocale()[0] ],
+        "language"          : [locale.getdefaultlocale()[0]],
         "forceUpdate"       : False,  # Use this to flag every single file as requiring an update, regardless of if the size matches. Use this if you know a file has changed, but you still have the old version (sizes were equal)
         "logLevel"          : "INFO",
         "test"              : False,
@@ -68,9 +70,9 @@ class Settings:
         """Strip Region / Script codes from Language codes in order to capture more files."""
 
         languages = Settings.Language()
-        for index, locale in enumerate(languages):
-            if "_" in locale:
-                Settings._settings["language"][index] = locale.split("_")[0]
+        for index, localeVar in enumerate(languages):
+            if "_" in localeVar:
+                Settings._settings["language"][index] = localeVar.split("_")[0]
 
         # There may be duplicates if multiple entries used the same Language, so strip them out
         Settings._settings["language"] = list(set(Settings._settings["language"]))
@@ -218,4 +220,4 @@ class Settings:
     @staticmethod
     def CleanEnabled() -> bool:
         """Get whether cleaning has been globally enabled."""
-        return bool(Settings._settings["disableClean"]) == False
+        return bool(Settings._settings["disableClean"]) is False

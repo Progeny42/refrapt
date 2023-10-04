@@ -22,7 +22,8 @@ from refrapt.classes import (
     Repository,
     UrlType,
     Downloader,
-    LogFilter
+    LogFilter,
+    Package
 )
 
 from refrapt.helpers import SanitiseUri
@@ -31,7 +32,7 @@ from refrapt.settings import Settings
 logger = logging.getLogger(__name__)
 
 repositories = [] # type: list[Repository]
-filesToKeep = list() # type : dict[str]
+filesToKeep = [] # type : list[str]
 appLockFile = "refrapt-lock"
 
 @click.command()
@@ -184,7 +185,7 @@ def PerformMirroring():
     global repositories
     global filesToKeep
 
-    filesToDownload = list([tuple()]) # type: list[tuple[str, int]]
+    filesToDownload = [] # type: list[Package]
     filesToDownload.clear()
 
     logger.info(f"Processing {len(repositories)} Repositories...")
@@ -223,14 +224,14 @@ def PerformMirroring():
     logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
     Downloader.Download(indexFiles, UrlType.Index)
 
-    # Record timestamps of downloaded files to later detemine which files have changed, 
+    # Record timestamps of downloaded files to later detemine which files have changed,
     # and therefore need to be processsed
     for repository in repositories:
         repository.Timestamp()
 
     # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
     print()
-    logger.info(f"Decompressing Packages / Sources Indices...")
+    logger.info("Decompressing Packages / Sources Indices...")
     for repository in tqdm.tqdm(repositories, position=0, unit=" repo", desc="Repositories "):
         repository.DecompressIndexFiles()
 
@@ -238,7 +239,7 @@ def PerformMirroring():
     print()
     logger.info("Building file list...")
     for repository in tqdm.tqdm([x for x in repositories if x.Modified], position=0, unit=" repo", desc="Repositories ", leave=False):
-        filesToDownload += repository.ParseIndexFiles() 
+        filesToDownload += repository.ParseIndexFiles()
 
     # Packages potentially add duplicate downloads, slowing down the rest
     # of the process. To counteract, remove duplicates now
@@ -284,7 +285,7 @@ def PerformMirroring():
 
     if Settings.Test():
         # Remove Release Files and Index Files added to /skel to ensure normal processing
-        # next time the application is run, otherwise the app will think it has all 
+        # next time the application is run, otherwise the app will think it has all
         # the latest files downloaded, when actually it only has the latest /skel Index files
         print()
         os.chdir(Settings.SkelPath())
@@ -353,11 +354,13 @@ def CreateConfig(conf: str):
 
     logger.info(f"Configuration file created for first use at '{conf}'. Add some Repositories and run again. Application exiting.")
 
-def Clean(repositories: list, requiredFiles: list):
+def Clean(repos: list, requiredFiles: list):
+    """Compiles a list of files to clean, and then removes them from disk"""
+
     # 5. Determine which files are in the mirror, but not listed in the Index files
     items = [] # type: list[str]
     logger.info("\tCompiling list of files to clean...")
-    uris = {repository.Uri.rstrip('/') for repository in repositories}
+    uris = {repository.Uri.rstrip('/') for repository in repos}
 
     for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False):
         walked = [] # type: list[str]
@@ -433,7 +436,7 @@ def PostMirrorClean():
     # remainder of the Packages and Sources files in for the Repository in order
     # to build a full list of maintained files.
     logger.info("\tProcessing unmodified Indices...")
-    umodifiedFiles = [] #type: list[str]
+    umodifiedFiles = [] # type: list[str]
     for repository in tqdm.tqdm(allUriRepositories, position=0, unit=" repo", desc="Repositories ", leave=False):
         umodifiedFiles += repository.ParseUnmodifiedIndexFiles()
 
@@ -453,7 +456,7 @@ def ConvertSize(size: int) -> str:
     i = int(math.floor(math.log(size, 1024)))
     p = math.pow(1024, i)
     s = round(size / p, 2)
-    return "%s %s" % (s, sizeName[i])
+    return f"{s} {sizeName[i]}"
 
 def GetRepositories(configData: list) -> list:
     """Determine the Repositories listed in the Configuration file."""

@@ -1,0 +1,16 @@
+---
+services:
+  refrapt:
+    image: progeny42/refrapt
+    container_name: refrapt
+    volumes:
+      - /path/to/refrapt:/app/refrapt
+      - /path/to/mirror:/config/www
+    ports:
+      - 8080:80/tcp
+      - 4330:443/tcp
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - CRON_SCHEDULE=* * * * *

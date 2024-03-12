@@ -328,7 +328,7 @@ class Repository:
             indexType = "Sources      "
 
         with multiprocessing.Pool(Settings.Threads()) as pool:
-            for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, indexFiles), position=1, total=len(indexFiles), unit=" index", desc=indexType, leave=False):
+            for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, indexFiles), position=1, total=len(indexFiles), unit=" index", desc=indexType, leave=False, disable=None):
                 pass
 
     def ParseIndexFiles(self) -> list[Package]:
@@ -349,7 +349,7 @@ class Repository:
 
         fileList = [] # type: list[Package]
 
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=None):
             fileList += self._ProcessIndex(Settings.SkelPath(), file, False)
 
         return fileList
@@ -366,7 +366,7 @@ class Repository:
 
         fileList = [] # type: list[Package]
 
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=None):
             fileList += self._ProcessIndex(Settings.MirrorPath(), file, True)
 
         return fileList
@@ -389,7 +389,7 @@ class Repository:
 
         fileList = [] # type: list[Package]
 
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=None):
             fileList += self._ProcessIndex(Settings.SkelPath(), file, True)
 
         return [x.Filename for x in fileList if x.Latest]
@@ -432,7 +432,7 @@ class Repository:
 
         mirror = Settings.MirrorPath() + "/" + path
 
-        for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages     ", leave=False, delay=0.5):
+        for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages     ", leave=False, delay=0.5, disable=None):
             if "Filename" in package:
                 # Packages Index
                 filename = package["Filename"]
@@ -816,7 +816,7 @@ class Downloader:
 
         with multiprocessing.Pool(Settings.Threads()) as pool:
             downloadFunc = partial(Downloader.DownloadUrlsProcess, kind=kind.name, args=arguments, logPath=Settings.VarPath(), rateLimit=Settings.LimitRate())
-            for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file"):
+            for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file", disable=None):
                 pass
 
     @staticmethod

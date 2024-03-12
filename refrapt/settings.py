@@ -71,7 +71,7 @@ class Settings:
 
         languages = Settings.Language()
         for index, localeVar in enumerate(languages):
-            if "_" in localeVar:
+            if localeVar and "_" in localeVar:
                 Settings._settings["language"][index] = localeVar.split("_")[0]
 
         # There may be duplicates if multiple entries used the same Language, so strip them out

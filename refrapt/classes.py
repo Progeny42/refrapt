@@ -54,7 +54,7 @@ class Package:
 
 class Repository:
     """Represents a Repository as defined the Configuration file."""
-    def __init__(self, line, defaultArch):
+    def __init__(self, line, defaultArch, quiet = False):
         """Initialises a Repository with a line from the Configuration file and the default Architecture."""
         self._repositoryType = RepositoryType.Bin
         self._architectures = [] # type: list[str]
@@ -62,6 +62,7 @@ class Repository:
         self._distribution = None
         self._components = [] # type: list[str]
         self._clean = True
+        self._quiet = quiet
 
         # Remove any inline comments
         if "#" in line:
@@ -328,7 +329,7 @@ class Repository:
             indexType = "Sources      "
 
         with multiprocessing.Pool(Settings.Threads()) as pool:
-            for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, indexFiles), position=1, total=len(indexFiles), unit=" index", desc=indexType, leave=False):
+            for _ in tqdm.tqdm(pool.imap_unordered(UnzipFile, indexFiles), position=1, total=len(indexFiles), unit=" index", desc=indexType, leave=False, disable=self._quiet):
                 pass
 
     def ParseIndexFiles(self) -> list[Package]:
@@ -349,7 +350,7 @@ class Repository:
 
         fileList = [] # type: list[Package]
 
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=self._quiet):
             fileList += self._ProcessIndex(Settings.SkelPath(), file, False)
 
         return fileList
@@ -366,7 +367,7 @@ class Repository:
 
         fileList = [] # type: list[Package]
 
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=self._quiet):
             fileList += self._ProcessIndex(Settings.MirrorPath(), file, True)
 
         return fileList
@@ -389,7 +390,7 @@ class Repository:
 
         fileList = [] # type: list[Package]
 
-        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False):
+        for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=self._quiet):
             fileList += self._ProcessIndex(Settings.SkelPath(), file, True)
 
         return [x.Filename for x in fileList if x.Latest]
@@ -432,7 +433,7 @@ class Repository:
 
         mirror = Settings.MirrorPath() + "/" + path
 
-        for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages     ", leave=False, delay=0.5):
+        for package in tqdm.tqdm(packages, position=2, unit=" pkgs", desc="Packages     ", leave=False, delay=0.5, disable=self._quiet):
             if "Filename" in package:
                 # Packages Index
                 filename = package["Filename"]
@@ -804,7 +805,7 @@ class Downloader:
                 os.remove(f"{Settings.VarPath()}/{file}")
 
     @staticmethod
-    def Download(urls: list, kind: UrlType):
+    def Download(urls: list, kind: UrlType, quiet: bool = False):
         """Download a list of files of a specific type"""
         if not urls:
             logger.info("No files to download")
@@ -816,7 +817,7 @@ class Downloader:
 
         with multiprocessing.Pool(Settings.Threads()) as pool:
             downloadFunc = partial(Downloader.DownloadUrlsProcess, kind=kind.name, args=arguments, logPath=Settings.VarPath(), rateLimit=Settings.LimitRate())
-            for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file"):
+            for _ in tqdm.tqdm(pool.imap_unordered(downloadFunc, urls), total=len(urls), unit=" file", disable=quiet):
                 pass
 
     @staticmethod
@@ -838,7 +839,7 @@ class Downloader:
         command = f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {normalisedUrl}"
 
         if args:
-            command += f" {args}"
+            command += f" {' '.join(args)}"
 
         with filelock.FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:

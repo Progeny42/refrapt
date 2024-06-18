@@ -40,7 +40,8 @@ appLockFile = "refrapt-lock"
 @click.option("--conf", default=f"{Settings.GetRootPath()}/refrapt.conf", help="Path to configuration file.", type=click.STRING)
 @click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files, and do not perform any cleaning.", type=click.BOOL)
 @click.option("--clean", is_flag=True, default=False, help="Clean all mirrors of unrequired files.", type=click.BOOL)
-def main(conf: str, test: bool, clean: bool):
+@click.option("--quiet", is_flag=True, default=False, help="Clean all mirrors of unrequired files.", type=click.BOOL)
+def main(conf: str, test: bool, clean: bool, quiet: bool):
     """A tool to mirror Debian Repositories for use as a local mirror."""
 
     me = singleton.SingleInstance() # will sys.exit(-1) if other instance is running
@@ -67,7 +68,7 @@ def main(conf: str, test: bool, clean: bool):
     if Settings.Test():
         logger.info("## Running in Test mode ##\n")
 
-    repositories = GetRepositories(configData)
+    repositories = GetRepositories(configData, quiet)
 
     if not repositories:
         logger.info("No Repositories found in configuration file. Application exiting.")
@@ -119,9 +120,9 @@ def main(conf: str, test: bool, clean: bool):
 
         print()
         if clean:
-            PerformClean()
+            PerformClean(quiet)
         else:
-            PerformMirroring()
+            PerformMirroring(quiet)
 
     # Lock file no longer required
     os.remove(f"{Settings.VarPath()}/{appLockFile}")
@@ -132,7 +133,7 @@ def main(conf: str, test: bool, clean: bool):
     print()
     logger.info(f"Refrapt completed in {datetime.timedelta(seconds=round(time.perf_counter() - startTime))}")
 
-def PerformClean():
+def PerformClean(quiet: bool = False):
     """Perform the cleaning of files on the local repository."""
     global repositories
     global filesToKeep
@@ -168,7 +169,7 @@ def PerformClean():
     # 4. Generate list of all files on disk according to the Index files
     logger.info("Reading all Packages...")
     fileList = []
-    for repository in tqdm.tqdm(cleanRepositories, position=0, unit=" repo", desc="Repositories ", leave=False):
+    for repository in tqdm.tqdm(cleanRepositories, position=0, unit=" repo", desc="Repositories ", leave=False, disable=quiet):
         fileList += repository.ParseIndexFilesFromLocalMirror()
 
     # Packages potentially add duplicates - remove duplicates now
@@ -177,9 +178,9 @@ def PerformClean():
 
     os.chdir(Settings.MirrorPath())
 
-    Clean(cleanRepositories, requiredFiles)
+    Clean(cleanRepositories, requiredFiles, quiet)
 
-def PerformMirroring():
+def PerformMirroring(quiet: bool = False):
     """Perform the main mirroring function of this application."""
 
     global repositories
@@ -201,7 +202,7 @@ def PerformMirroring():
         filesToKeep.append(os.path.normpath(SanitiseUri(releaseFile)))
 
     logger.info(f"Compiled a list of {len(releaseFiles)} Release files for download")
-    Downloader.Download(releaseFiles, UrlType.Release)
+    Downloader.Download(releaseFiles, UrlType.Release, quiet=quiet)
 
     # 1a. Verify after the download that the Repositories actually exist
     allRepos = list(repositories)
@@ -222,7 +223,7 @@ def PerformMirroring():
 
     print()
     logger.info(f"Compiled a list of {len(indexFiles)} Index files for download")
-    Downloader.Download(indexFiles, UrlType.Index)
+    Downloader.Download(indexFiles, UrlType.Index, quiet=quiet)
 
     # Record timestamps of downloaded files to later detemine which files have changed,
     # and therefore need to be processsed
@@ -232,13 +233,13 @@ def PerformMirroring():
     # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
     print()
     logger.info("Decompressing Packages / Sources Indices...")
-    for repository in tqdm.tqdm(repositories, position=0, unit=" repo", desc="Repositories "):
+    for repository in tqdm.tqdm(repositories, position=0, unit=" repo", desc="Repositories ", disable=quiet):
         repository.DecompressIndexFiles()
 
     # 4. Parse all Index files (Package or Source) to collate all files that need to be downloaded
     print()
     logger.info("Building file list...")
-    for repository in tqdm.tqdm([x for x in repositories if x.Modified], position=0, unit=" repo", desc="Repositories ", leave=False):
+    for repository in tqdm.tqdm([x for x in repositories if x.Modified], position=0, unit=" repo", desc="Repositories ", leave=False, disable=quiet):
         filesToDownload += repository.ParseIndexFiles()
 
     # Packages potentially add duplicate downloads, slowing down the rest
@@ -255,13 +256,13 @@ def PerformMirroring():
 
     os.chdir(Settings.MirrorPath())
     if not Settings.Test():
-        Downloader.Download([x.Filename for x in filesToDownload if not x.Latest], UrlType.Archive)
+        Downloader.Download([x.Filename for x in filesToDownload if not x.Latest], UrlType.Archive, quiet=quiet)
 
     # 6. Copy Skel to Main Archive
     if not Settings.Test():
         print()
         logger.info("Copying Skel to Mirror")
-        for indexUrl in tqdm.tqdm(filesToKeep, unit=" files"):
+        for indexUrl in tqdm.tqdm(filesToKeep, unit=" files", disable=quiet):
             skelFile   = f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"
             if os.path.isfile(skelFile):
                 mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
@@ -279,7 +280,7 @@ def PerformMirroring():
     # 7. Remove any unused files
     print()
     if Settings.CleanEnabled():
-        PostMirrorClean()
+        PostMirrorClean(quiet)
     else:
         logger.info("Skipping Clean")
 
@@ -354,7 +355,7 @@ def CreateConfig(conf: str):
 
     logger.info(f"Configuration file created for first use at '{conf}'. Add some Repositories and run again. Application exiting.")
 
-def Clean(repos: list, requiredFiles: list):
+def Clean(repos: list, requiredFiles: list, quiet: bool = False):
     """Compiles a list of files to clean, and then removes them from disk"""
 
     # 5. Determine which files are in the mirror, but not listed in the Index files
@@ -362,10 +363,10 @@ def Clean(repos: list, requiredFiles: list):
     logger.info("\tCompiling list of files to clean...")
     uris = {repository.Uri.rstrip('/') for repository in repos}
 
-    for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False):
+    for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False, disable=quiet):
         walked = [] # type: list[str]
-        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5):
-            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files        ", leave=False, delay=0.5):
+        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5, disable=quiet):
+            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files        ", leave=False, delay=0.5, disable=quiet):
                 walked.append(os.path.join(root, file))
 
         logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
@@ -382,7 +383,7 @@ def Clean(repos: list, requiredFiles: list):
     if items:
         logger.info("\tCalculating space savings...")
         clearSize = 0
-        for file in tqdm.tqdm(items, unit=" files", leave=False):
+        for file in tqdm.tqdm(items, unit=" files", leave=False, disable=quiet):
             clearSize += os.path.getsize(file)
     else:
         logger.info("\tNo files eligible to clean")
@@ -398,7 +399,7 @@ def Clean(repos: list, requiredFiles: list):
     for item in items:
         os.remove(item)
 
-def PostMirrorClean():
+def PostMirrorClean(quiet: bool = False):
     """Clean any files or directories that are not used.
 
        Determination of whether a file or directory is used
@@ -437,7 +438,7 @@ def PostMirrorClean():
     # to build a full list of maintained files.
     logger.info("\tProcessing unmodified Indices...")
     umodifiedFiles = [] # type: list[str]
-    for repository in tqdm.tqdm(allUriRepositories, position=0, unit=" repo", desc="Repositories ", leave=False):
+    for repository in tqdm.tqdm(allUriRepositories, position=0, unit=" repo", desc="Repositories ", leave=False, disable=quiet):
         umodifiedFiles += repository.ParseUnmodifiedIndexFiles()
 
     # Packages potentially add duplicate downloads, slowing down the rest
@@ -445,7 +446,7 @@ def PostMirrorClean():
     requiredFiles = [] # type: list[str]
     requiredFiles = list(set(filesToKeep)) + list(set(umodifiedFiles))
 
-    Clean(cleanRepositories, requiredFiles)
+    Clean(cleanRepositories, requiredFiles, quiet)
 
 def ConvertSize(size: int) -> str:
     """Convert a number of bytes into a number with a suitable unit."""
@@ -458,10 +459,10 @@ def ConvertSize(size: int) -> str:
     s = round(size / p, 2)
     return f"{s} {sizeName[i]}"
 
-def GetRepositories(configData: list) -> list:
+def GetRepositories(configData: list, quiet: bool) -> list:
     """Determine the Repositories listed in the Configuration file."""
     for line in [x for x in configData if x.startswith("deb")]:
-        repositories.append(Repository(line, Settings.Architecture()))
+        repositories.append(Repository(line, Settings.Architecture(), quiet))
 
     for line in [x for x in configData if x.startswith("clean")]:
         if "False" in line:

@@ -838,7 +838,7 @@ class Downloader:
         command = f"{baseCommand} {rateLimit} {retries} {recursiveOpts} {logFile} {normalisedUrl}"
 
         if args:
-            command += f" {args}"
+            command += f" {' '.join(args)}"
 
         with filelock.FileLock(f"{filename}.lock"):
             with open(filename, "w") as f:

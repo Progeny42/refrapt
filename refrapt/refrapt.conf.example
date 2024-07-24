@@ -78,6 +78,8 @@ set test               = False
 set byHash             = False
 # Specify whether to disable Cleaning for all mirrors in this configuration file.
 set disableClean       = False
+# Set to True to disable progress bars
+set disableProgress    = False
 
 #####################
 ## REPOSITORY LIST ##

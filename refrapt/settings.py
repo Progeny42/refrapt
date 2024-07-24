@@ -34,7 +34,8 @@ class Settings:
         "logLevel"          : "INFO",
         "test"              : False,
         "byHash"            : False,
-        "disableClean"      : False
+        "disableClean"      : False,
+        "disableProgress"   : False
     }
     _previousRunInterrupted = False
 
@@ -221,3 +222,13 @@ class Settings:
     def CleanEnabled() -> bool:
         """Get whether cleaning has been globally enabled."""
         return bool(Settings._settings["disableClean"]) is False
+    
+    @staticmethod
+    def ProgressBarsEnabled() -> bool:
+        """Get whether progress bars are enabled."""
+        return bool(Settings._settings["disableProgress"])
+
+    @staticmethod
+    def DisableProgressBars():
+        """Disable progress bars."""
+        Settings._settings["disableProgress"] = True

@@ -40,7 +40,8 @@ appLockFile = "refrapt-lock"
 @click.option("--conf", default=f"{Settings.GetRootPath()}/refrapt.conf", help="Path to configuration file.", type=click.STRING)
 @click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files, and do not perform any cleaning.", type=click.BOOL)
 @click.option("--clean", is_flag=True, default=False, help="Clean all mirrors of unrequired files.", type=click.BOOL)
-def main(conf: str, test: bool, clean: bool):
+@click.option("--no-progress", is_flag=True, default=False, help="Do not display progress bars.", type=click.BOOL)
+def main(conf: str, test: bool, clean: bool, noProgress: bool):
     """A tool to mirror Debian Repositories for use as a local mirror."""
 
     me = singleton.SingleInstance() # will sys.exit(-1) if other instance is running
@@ -66,6 +67,10 @@ def main(conf: str, test: bool, clean: bool):
 
     if Settings.Test():
         logger.info("## Running in Test mode ##\n")
+
+    # Ensure that command line argument for noProgress overrides if it is set in the configuration file
+    if noProgress:
+        Settings.DisableProgressBars()
 
     repositories = GetRepositories(configData)
 
@@ -168,7 +173,7 @@ def PerformClean():
     # 4. Generate list of all files on disk according to the Index files
     logger.info("Reading all Packages...")
     fileList = []
-    for repository in tqdm.tqdm(cleanRepositories, position=0, unit=" repo", desc="Repositories ", leave=False):
+    for repository in tqdm.tqdm(cleanRepositories, position=0, unit=" repo", desc="Repositories ", leave=False, disable=not Settings.ProgressBarsEnabled()):
         fileList += repository.ParseIndexFilesFromLocalMirror()
 
     # Packages potentially add duplicates - remove duplicates now
@@ -232,13 +237,13 @@ def PerformMirroring():
     # 3. Unzip each of the Packages / Sources indices and obtain a list of all files to download
     print()
     logger.info("Decompressing Packages / Sources Indices...")
-    for repository in tqdm.tqdm(repositories, position=0, unit=" repo", desc="Repositories "):
+    for repository in tqdm.tqdm(repositories, position=0, unit=" repo", desc="Repositories ", disable=not Settings.ProgressBarsEnabled()):
         repository.DecompressIndexFiles()
 
     # 4. Parse all Index files (Package or Source) to collate all files that need to be downloaded
     print()
     logger.info("Building file list...")
-    for repository in tqdm.tqdm([x for x in repositories if x.Modified], position=0, unit=" repo", desc="Repositories ", leave=False):
+    for repository in tqdm.tqdm([x for x in repositories if x.Modified], position=0, unit=" repo", desc="Repositories ", leave=False, disable=not Settings.ProgressBarsEnabled()):
         filesToDownload += repository.ParseIndexFiles()
 
     # Packages potentially add duplicate downloads, slowing down the rest
@@ -261,7 +266,7 @@ def PerformMirroring():
     if not Settings.Test():
         print()
         logger.info("Copying Skel to Mirror")
-        for indexUrl in tqdm.tqdm(filesToKeep, unit=" files"):
+        for indexUrl in tqdm.tqdm(filesToKeep, unit=" files", disable=not Settings.ProgressBarsEnabled()):
             skelFile   = f"{Settings.SkelPath()}/{SanitiseUri(indexUrl)}"
             if os.path.isfile(skelFile):
                 mirrorFile = f"{Settings.MirrorPath()}/{SanitiseUri(indexUrl)}"
@@ -362,10 +367,10 @@ def Clean(repos: list, requiredFiles: list):
     logger.info("\tCompiling list of files to clean...")
     uris = {repository.Uri.rstrip('/') for repository in repos}
 
-    for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False):
+    for uri in tqdm.tqdm(uris, position=0, unit=" repo", desc="Repositories ", leave=False, disable=not Settings.ProgressBarsEnabled()):
         walked = [] # type: list[str]
-        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5):
-            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files        ", leave=False, delay=0.5):
+        for root, _, files in tqdm.tqdm(os.walk(SanitiseUri(uri)), position=1, unit=" fso", desc="FSO          ", leave=False, delay=0.5, disable=not Settings.ProgressBarsEnabled()):
+            for file in tqdm.tqdm(files, position=2, unit=" file", desc="Files        ", leave=False, delay=0.5, disable=not Settings.ProgressBarsEnabled()):
                 walked.append(os.path.join(root, file))
 
         logger.debug(f"{SanitiseUri(uri)}: Walked {len(walked)} items")
@@ -382,7 +387,7 @@ def Clean(repos: list, requiredFiles: list):
     if items:
         logger.info("\tCalculating space savings...")
         clearSize = 0
-        for file in tqdm.tqdm(items, unit=" files", leave=False):
+        for file in tqdm.tqdm(items, unit=" files", leave=False, disable=not Settings.ProgressBarsEnabled()):
             clearSize += os.path.getsize(file)
     else:
         logger.info("\tNo files eligible to clean")
@@ -437,7 +442,7 @@ def PostMirrorClean():
     # to build a full list of maintained files.
     logger.info("\tProcessing unmodified Indices...")
     umodifiedFiles = [] # type: list[str]
-    for repository in tqdm.tqdm(allUriRepositories, position=0, unit=" repo", desc="Repositories ", leave=False):
+    for repository in tqdm.tqdm(allUriRepositories, position=0, unit=" repo", desc="Repositories ", leave=False, disable=not Settings.ProgressBarsEnabled()):
         umodifiedFiles += repository.ParseUnmodifiedIndexFiles()
 
     # Packages potentially add duplicate downloads, slowing down the rest

@@ -41,7 +41,7 @@ appLockFile = "refrapt-lock"
 @click.option("--test", is_flag=True, default=False, help="Do not perform the main download for any .deb or source files, and do not perform any cleaning.", type=click.BOOL)
 @click.option("--clean", is_flag=True, default=False, help="Clean all mirrors of unrequired files.", type=click.BOOL)
 @click.option("--no-progress", is_flag=True, default=False, help="Do not display progress bars.", type=click.BOOL)
-def main(conf: str, test: bool, clean: bool, noProgress: bool):
+def main(conf: str, test: bool, clean: bool, no_progress: bool):
     """A tool to mirror Debian Repositories for use as a local mirror."""
 
     me = singleton.SingleInstance() # will sys.exit(-1) if other instance is running
@@ -68,8 +68,8 @@ def main(conf: str, test: bool, clean: bool, noProgress: bool):
     if Settings.Test():
         logger.info("## Running in Test mode ##\n")
 
-    # Ensure that command line argument for noProgress overrides if it is set in the configuration file
-    if noProgress:
+    # Ensure that command line argument for no_progress overrides if it is set in the configuration file
+    if no_progress:
         Settings.DisableProgressBars()
 
     repositories = GetRepositories(configData)

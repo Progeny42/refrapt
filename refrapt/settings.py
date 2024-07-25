@@ -222,11 +222,11 @@ class Settings:
     def CleanEnabled() -> bool:
         """Get whether cleaning has been globally enabled."""
         return bool(Settings._settings["disableClean"]) is False
-    
+
     @staticmethod
     def ProgressBarsEnabled() -> bool:
         """Get whether progress bars are enabled."""
-        return bool(Settings._settings["disableProgress"])
+        return bool(Settings._settings["disableProgress"]) is False
 
     @staticmethod
     def DisableProgressBars():

@@ -1,12 +1,11 @@
-name: Build and Publish Refrapt On Release
+name: Build, and Run
 
 on:
   push:
-    tags:
-      - 'v*' # Trigger on version tags, e.g., v1.0.0
+  pull_request:
 
 jobs:
-  publish:
+  build-run:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,14 +20,16 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-  
+
     - name: Build project
       run: |
         pip install build
         python -m build
 
-    - name: Publish package
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Install built package
+      run: |
+        pip install dist/*.whl
+
+    - name: Run to check it at least starts
+      run: |
+        refrapt --version

@@ -10,7 +10,7 @@ class Settings:
     """Contains the loaded settings for the application."""
 
     _settings = {
-        "architecture"      : platform.machine(),
+        "architecture"      : platform.machine().lower(),
         "rootPath"          : f"{str(Path.home())}/refrapt",
         "mirrorPath"        : f"{str(Path.home())}/refrapt/mirror",
         "skelPath"          : f"{str(Path.home())}/refrapt/skel",

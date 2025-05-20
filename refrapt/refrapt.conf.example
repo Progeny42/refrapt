@@ -24,7 +24,7 @@ set architecture       = i386
 
 # Specify whether the Contents-[arch].* files should be downloaded.
 set contents           = True
-# The number of threads to use for download and decompression. 
+# The number of threads to use for download and decompression.
 # If not specified here, Refrapt will get the number available from the machine.
 set threads            = 6
 # Specify whether to add the --auth-no-challenge parameter to Wget.
@@ -49,18 +49,18 @@ set certificate        = ""
 set caCertificate      = ""
 # The SSL key to pass to Wget.
 set privateKey         = ""
-# Set the --limit-rate value for each Wget instance. 
+# Set the --limit-rate value for each Wget instance.
 # Note that this will be multipled by the number of threads specified.
 # See Wget manpage for correct syntax
 set limitRate          = 500m # 500 MB
 # Limits the download of Translation files for that of your locale. When not specified, Refrapt will default to locale.getdefaultlocale().
-# Note that "_XX" languages will be stripped of the locale to collect a wider number of files. Ie "en_GB" becomes "en", which will capture 
+# Note that "_XX" languages will be stripped of the locale to collect a wider number of files. Ie "en_GB" becomes "en", which will capture
 # files with the same base language, but different locales.
 # Multiple Languages can also be listed in a comma separated list; for example "en_GB, de_DE".
 # set language           = "en_GB"
 # Tell Refrapt to update all files, regardless of whether they are deemed to have changed or not.
 # Note that if Wget determines the files are unchanged (via Timestamping), this will have no effect.
-# The use of this should be limited for when you know a package has changed, but the size has not 
+# The use of this should be limited for when you know a package has changed, but the size has not
 # (which is how Refrapt determines whether the file needs updating)
 set forceUpdate        = False
 # The log level to use for the application. Possible values are:
@@ -70,7 +70,7 @@ set forceUpdate        = False
 # ERROR
 # CRITICAL
 set logLevel           = INFO
-# Will cause Refrapt to only process the Index files, and determine the list of Binary / Sources files to download, 
+# Will cause Refrapt to only process the Index files, and determine the list of Binary / Sources files to download,
 # and their size, but will not perform the main download. Useful for determining a potential download size before
 # committing to it.
 set test               = False
@@ -99,10 +99,16 @@ set disableProgress    = False
 # Flat repository
 # deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64
 
+# Flat repository with regex
+## This regex matches strings that correspond to a specific package version number, specifically: 10.11.XX
+# regex=10.11.1[1-9] deb https://mirrors.xtom.de/mariadb/repo/10.11/debian bookworm main
+## This regex matches either "vault_1.15" or "vault_1.16", or "consul_1.18" or "consul_1.21".
+# regex=(vault_1\.(15|16)|consul_1.(18|21)) deb https://apt.releases.hashicorp.com bookworm main
+
 ###################
 ## DISABLE CLEAN ##
 ###################
-# Cleaning of unrequired files is enabled by default. To prevent cleaning 
+# Cleaning of unrequired files is enabled by default. To prevent cleaning
 # a particular directory, add the following command
 
 # clean=False deb http://gb.archive.ubuntu.com/ubuntu

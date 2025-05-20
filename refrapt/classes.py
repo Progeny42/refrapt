@@ -54,7 +54,7 @@ class Package:
 
 class Repository:
     """Represents a Repository as defined the Configuration file."""
-    def __init__(self, line, defaultArch):
+    def __init__(self, line, defaultArch, regex):
         """Initialises a Repository with a line from the Configuration file and the default Architecture."""
         self._repositoryType = RepositoryType.Bin
         self._architectures = [] # type: list[str]
@@ -62,6 +62,7 @@ class Repository:
         self._distribution = None
         self._components = [] # type: list[str]
         self._clean = True
+        self._regex = regex
 
         # Remove any inline comments
         if "#" in line:
@@ -350,7 +351,7 @@ class Repository:
         fileList = [] # type: list[Package]
 
         for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=not Settings.ProgressBarsEnabled()):
-            fileList += self._ProcessIndex(Settings.SkelPath(), file, False)
+            fileList += self._ProcessIndex(Settings.SkelPath(), file, False, self._regex)
 
         return fileList
 
@@ -367,7 +368,7 @@ class Repository:
         fileList = [] # type: list[Package]
 
         for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=not Settings.ProgressBarsEnabled()):
-            fileList += self._ProcessIndex(Settings.MirrorPath(), file, True)
+            fileList += self._ProcessIndex(Settings.MirrorPath(), file, True, self._regex)
 
         return fileList
 
@@ -390,7 +391,7 @@ class Repository:
         fileList = [] # type: list[Package]
 
         for file in tqdm.tqdm(indices, position=1, unit=" index", desc="Indices      ", leave=False, disable=not Settings.ProgressBarsEnabled()):
-            fileList += self._ProcessIndex(Settings.SkelPath(), file, True)
+            fileList += self._ProcessIndex(Settings.SkelPath(), file, True, self._regex)
 
         return [x.Filename for x in fileList if x.Latest]
 
@@ -407,7 +408,7 @@ class Repository:
         path = Path(repositoryDirectory)
         return os.path.isdir(path.parent.absolute())
 
-    def _ProcessIndex(self, indexRoot: str, index: str, skipUpdateCheck: bool) -> list[Package]:
+    def _ProcessIndex(self, indexRoot: str, index: str, skipUpdateCheck: bool, regex=None) -> list[Package]:
         """
             Processes each package listed in the Index file.
 
@@ -436,6 +437,9 @@ class Repository:
             if "Filename" in package:
                 # Packages Index
                 filename = package["Filename"]
+
+                if self._regex and not re.search(self._regex, filename):
+                    continue
 
                 if filename.startswith("./"):
                     filename = filename[2:]

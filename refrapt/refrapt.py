@@ -465,12 +465,14 @@ def ConvertSize(size: int) -> str:
 
 def GetRepositories(configData: list) -> list:
     """Determine the Repositories listed in the Configuration file."""
-    for line in [x for x in configData if x.startswith("deb")]:
-        repositories.append(Repository(line, Settings.Architecture()))
-
-    for line in [x for x in configData if x.startswith("clean")]:
-        if "False" in line:
-            uri = line.split(" ")[1]
+    for line in configData:
+        if line.startswith("deb"):
+            repositories.append(Repository(line, Settings.Architecture(), None))
+        elif line.startswith("regex="):
+            split_line = line.split(' ', 1)
+            repositories.append(Repository(split_line[1], Settings.Architecture(), split_line[0].replace("regex=", "")))
+        elif line.startswith("clean=") and "False" in line:
+            uri = line.split(' ')[2]
             repository = [x for x in repositories if x.Uri == uri]
             repository[0].Clean = False
             logger.debug(f"Not cleaning {uri}")

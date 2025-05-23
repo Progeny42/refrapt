@@ -824,13 +824,15 @@ class Downloader:
         """Worker method for downloading a particular Url, used in multiprocessing."""
         process = multiprocessing.current_process()
 
+        filename = f"{logPath}/Download-lock.{process._identity[0]}"
+
+        log_file = f"{logPath}/{kind}-log.{process._identity[0]}"
+
         baseCommand   = "wget --no-cache -N --no-verbose"
         rateLimit     = f"--limit-rate={rateLimit}"
         retries       = "--tries=20 --waitretry=60 --retry-on-http-error=503,429"
         recursiveOpts = "--recursive --level=inf"
-        logFile       = f"-a {logPath}/{kind}-log.{process._identity[0]}"
-
-        filename = f"{logPath}/Download-lock.{process._identity[0]}"
+        logFile       = f"-a {log_file}"
 
         # Ensure forward slashes are used for URLs
         normalisedUrl = url.replace(os.sep, '/')
@@ -847,6 +849,12 @@ class Downloader:
             os.system(command)
 
             os.remove(filename)
+
+            # Check for the presence of the 403 error in the error log
+            with open(log_file, "r") as f:
+                error_content = f.read()
+                if "Release" in url and "Proxy tunneling failed: Forbidden" in error_content:
+                    logger.warning(f"Error encountered while trying to connect through the proxy for URL: {url}")
 
     @staticmethod
     def CustomArguments() -> list:

@@ -935,7 +935,7 @@ class Index:
                 else:
                     key = line.split(":")[0]
                     if key in keywords:
-                        value = line.split(":")[1].strip()
+                        value = line.split(":",1)[1].strip()
                         package[key] = value
                     else:
                         # Ignore, we don't need it
